@@ -81,11 +81,11 @@ export class WebsocketGateway implements OnModuleInit, OnModuleDestroy {
         }
       })
 
-      this.server.register('getQueuedMessagesCount', async (params: any) => {
+      this.server.register('getAvailableMessageCount', async (params: any) => {
         try {
           return await this.websocketService.getAvailableMessageCount(params)
         } catch (error) {
-          this.logger.error('Error in getQueuedMessagesCount method', error.stack)
+          this.logger.error('Error in getAvailableMessageCount method', error.stack)
           throw this.server.createError(500, 'Internal server error', { details: error.message })
         }
       })

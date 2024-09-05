@@ -1,9 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
-import { ConfigService, ConfigModule } from '@nestjs/config'
+import { ConfigService } from '@nestjs/config'
 import { Model } from 'mongoose'
 import { ObjectId } from 'mongodb'
-import { Socket } from 'socket.io'
 import { MessageState } from '../config/constants'
 import {
   AddMessageDto,
@@ -45,50 +44,6 @@ export class WebsocketService {
       this.logger.log(`Connected to Redis successfully, ping response: ${pong}`)
     } catch (error) {
       this.logger.error('Failed to connect to Redis:', error.message)
-    }
-  }
-
-  /**
-   * Handles WebSocket requests by routing the request type to the appropriate method.
-   *
-   * @param {Object} message - The message object containing the request type and options.
-   * @param {string} message.request - The type of request being made (e.g., 'takeFromQueue', 'addMessage').
-   * @param {any} message.options - The options or parameters required by the specific request type.
-   * @returns {Promise<any>} - Returns the result of the corresponding method or a warning if the command is unknown.
-   */
-  async wsRequest(message: { request: string; options: any }): Promise<any> {
-    const { request, options } = message
-    this.logger.log(`[wsRequest] message request: ${message.request} ***`)
-
-    switch (request) {
-      case 'takeFromQueue':
-        // Handles the request to take messages from the queue
-        return this.takeFromQueue(options)
-      case 'getQueuedMessagesCount':
-        // Handles the request to get the count of queued messages
-        return this.getAvailableMessageCount(options)
-      case 'addMessage':
-        // Handles the request to add a message to the queue
-        return this.addMessage(options)
-      case 'removeMessages':
-        // Handles the request to remove messages from the queue
-        return this.removeMessages(options)
-      case 'getLiveSession':
-        // Handles the request to retrieve a live session
-        return this.getLiveSession(options)
-      case 'addLiveSession':
-        // Handles the request to add a live session
-        return this.addLiveSession(options)
-      case 'removeLiveSession':
-        // Handles the request to remove a live session
-        return this.removeLiveSession(options)
-      case 'ping':
-        // Simple health check response
-        return 'pong'
-      default:
-        // Logs a warning if the request type is unknown
-        this.logger.warn(`Unknown command received: ${request}`)
-        return `Unknown command: ${request}`
     }
   }
 
@@ -359,7 +314,7 @@ export class WebsocketService {
         // Subscribes to the Redis channel for the connection ID
         await this.redisSubscriber.subscribe(connectionId, (err, count) => {
           if (err) this.logger.error(err.message)
-          this.logger.log(`Subscribed to ${connectionId} channel.`)
+          this.logger.log(`Subscribed ${count} to ${connectionId} channel.`)
         })
 
         // Handles messages received on the subscribed Redis channel
@@ -367,6 +322,8 @@ export class WebsocketService {
           if (channel === connectionId) {
             this.logger.log(`** Received message from ${channel}: ${message} **`)
             // TODO: Handle the new message for the connectionId
+            //this.takeFromQueue()
+            //Client.notify('messageReceipt',option{connectionId,this.queuedMessage})
           }
         })
         return true

@@ -2,10 +2,8 @@ import { NestFactory } from '@nestjs/core'
 import { AppModule } from './app.module'
 import { ConfigService } from '@nestjs/config'
 import { Logger, VersioningType } from '@nestjs/common'
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { getLogLevels } from './config/logger.config'
 import * as fs from 'fs'
-import { WsAdapter } from './config/ws.adapter'
 
 /**
  * Bootstraps the NestJS application, setting up configurations, middleware, and documentation.
@@ -24,26 +22,10 @@ async function bootstrap(): Promise<void> {
   const configService = app.get(ConfigService)
   const logger = new Logger(bootstrap.name)
 
-  // Set up WebSocket adapter
-  app.useWebSocketAdapter(new WsAdapter(app) as any)
-
   // Enable URI versioning for API routes
   app.enableVersioning({
     type: VersioningType.URI,
   })
-
-  /**
-   * Documentation Builder
-   * Set up Swagger for API documentation
-   */
-  const config = new DocumentBuilder()
-    .setTitle('message-pickup-repository')
-    .setDescription('API handle files via websocket')
-    .setVersion('0.0.1')
-    .addTag('message-pickup-repository')
-    .build()
-  const document = SwaggerModule.createDocument(app, config)
-  SwaggerModule.setup('q', app, document)
 
   // Enable Cross-Origin Resource Sharing (CORS)
   app.enableCors()
