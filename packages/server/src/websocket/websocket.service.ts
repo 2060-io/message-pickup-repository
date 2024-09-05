@@ -12,11 +12,12 @@ import {
   AddLiveSessionDto,
 } from './dto/messagerepository-websocket.dto'
 import { StoreLiveSession } from './schemas/StoreLiveSession'
-import { QueuedMessage } from './schemas/QueuedMessage'
+import { StoreQueuedMessage } from './schemas/StoreQueuedMessage'
 import { InstanceRegistration } from './schemas/InstanceRegistration'
 import { InjectRedis } from '@nestjs-modules/ioredis'
 import { lastValueFrom } from 'rxjs'
 import { HttpService } from '@nestjs/axios'
+import { QueuedMessage } from '@credo-ts/core'
 import Redis from 'ioredis'
 
 @Injectable()
@@ -27,7 +28,7 @@ export class WebsocketService {
   private readonly redisPublisher: Redis
 
   constructor(
-    @InjectModel(QueuedMessage.name) private queuedMessage: Model<QueuedMessage>,
+    @InjectModel(StoreQueuedMessage.name) private queuedMessage: Model<StoreQueuedMessage>,
     @InjectModel(StoreLiveSession.name) private storeLiveSession: Model<StoreLiveSession>,
     @InjectModel(InstanceRegistration.name) private instanceRegistration: Model<InstanceRegistration>,
     @InjectRedis() private readonly redis: Redis,
@@ -48,7 +49,8 @@ export class WebsocketService {
   }
 
   /**
-   * Retrieves messages from the queue based on the provided criteria.
+   * Retrieves messages from both Redis and MongoDB based on the provided criteria.
+   * This method retrieves messages from Redis for the specified connection ID, as well as messages stored in MongoDB.
    *
    * @param {TakeFromQueueDto} dto - Data transfer object containing the query parameters.
    * @param {string} dto.connectionId - The unique identifier of the connection.
@@ -58,50 +60,59 @@ export class WebsocketService {
    * @returns {Promise<QueuedMessage[]>} - A promise that resolves to an array of queued messages.
    */
   async takeFromQueue(dto: TakeFromQueueDto): Promise<QueuedMessage[]> {
-    const { connectionId, limit, deleteMessages, recipientDid } = dto
+    const { connectionId, limit = 10, deleteMessages, recipientDid } = dto
 
-    this.logger.debug('[takeFromQueue] Method called with DTO:', JSON.stringify(dto, null, 2))
+    this.logger.debug('[takeFromQueue] Method called with DTO:', dto)
 
     try {
-      // Ensures the queuedMessage model is initialized before proceeding
-      if (!this.queuedMessage) {
-        throw new Error('[takeFromQueue] queuedMessage model is not initialized')
-      }
+      // Retrieve messages from Redis
+      const redisMessagesRaw = await this.redis.lrange(`connectionId:${connectionId}:messages`, 0, limit - 1)
+      const redisMessages: QueuedMessage[] = redisMessagesRaw.map((message) => {
+        const parsedMessage = JSON.parse(message)
 
-      let messagesToUpdateIds: string[] = []
+        // Map Redis data to QueuedMessage type
+        return {
+          id: parsedMessage.messageId,
+          receivedAt: new Date(parsedMessage.receivedAt),
+          encryptedMessage: parsedMessage.encryptedMessage,
+        }
+      })
 
-      // Fetches the messages based on connectionId or recipientDid, and in 'pending' state
-      const storedMessages = await this.queuedMessage
+      this.logger.debug(
+        `[takeFromQueue] Fetched ${redisMessages.length} messages from Redis for connectionId ${connectionId}`,
+      )
+
+      // Query MongoDB with the provided connectionId or recipientDid, and state 'pending'
+      const mongoMessages = await this.queuedMessage
         .find({
           $or: [{ connectionId }, { recipientKeys: recipientDid }],
           state: 'pending',
         })
-        .sort({ createdAt: 1 }) // Sort messages by creation date (oldest first)
-        .limit(limit ?? 0) // Limits the number of messages based on the provided limit
-        .select({ _id: 1, state: 1, encryptedMessage: 1, createdAt: 1, receivedAt: '$createdAt' })
+        .sort({ createdAt: 1 })
+        .limit(limit)
+        .select({ _id: 1, encryptedMessage: 1, createdAt: 1 })
+        .lean()
         .exec()
 
-      // Extracts the message IDs for updating their state later
-      messagesToUpdateIds = storedMessages.map((message) => message._id.toString())
+      const mongoMappedMessages: QueuedMessage[] = mongoMessages.map((msg) => ({
+        id: msg._id.toString(),
+        receivedAt: msg.createdAt,
+        encryptedMessage: msg.encryptedMessage,
+      }))
 
-      // If deleteMessages is not requested, update the state of the fetched messages to 'sending'
-      if (!deleteMessages && messagesToUpdateIds.length > 0) {
-        this.logger.debug('[takeFromQueue] Updating the state of messages to "sending"')
-        await this.queuedMessage.updateMany({ _id: { $in: messagesToUpdateIds } }, { $set: { state: 'sending' } })
-      }
+      this.logger.debug(
+        `[takeFromQueue] Fetched ${mongoMappedMessages.length} messages from MongoDB for connectionId ${connectionId}`,
+      )
 
-      // Maps the stored messages to the QueuedMessage format, excluding the _id field
-      const messages = storedMessages.map((message) => {
-        const { _id, ...rest } = message
-        return { id: _id.toString(), ...rest } as QueuedMessage
-      })
+      // Combine messages from Redis and MongoDB
+      const combinedMessages: QueuedMessage[] = [...redisMessages, ...mongoMappedMessages]
 
-      this.logger.debug('[takeFromQueue] Messages to return:', JSON.stringify(messages, null, 2))
-
-      return messages
+      return combinedMessages
     } catch (error) {
-      // Logs the error and returns an empty array if an exception occurs
-      this.logger.error('[takeFromQueue] Error:', error)
+      this.logger.error('[takeFromQueue] Error retrieving messages from Redis and MongoDB:', {
+        connectionId,
+        error: error.message,
+      })
       return []
     }
   }
@@ -114,27 +125,20 @@ export class WebsocketService {
    * @returns {Promise<number>} - A promise that resolves to the number of available messages.
    */
   async getAvailableMessageCount(dto: ConnectionIdDto): Promise<number> {
-    this.logger.debug('[getAvailableMessageCount] Initializing method', { dto })
     const { connectionId } = dto
 
-    // Ensures the queuedMessage model is initialized before proceeding
-    if (!this.queuedMessage) {
-      this.logger.error('[getAvailableMessageCount] queuedMessage model is not initialized')
-      throw new Error('[getAvailableMessageCount] queuedMessage model is not initialized')
-    }
+    this.logger.debug('[getAvailableMessageCount] Initializing method', { connectionId })
 
     try {
-      // Retrieves the count of messages in the queue for the specified connection ID
-      const messageCount = await this.queuedMessage.countDocuments({ connectionId })
+      // retrieve the list count of messages for the connection
+      const messageCount = await this.redis.llen(`connectionId:${connectionId}:messages`)
 
-      this.logger.debug('[getAvailableMessageCount] Message count retrieved', {
-        connectionId,
+      this.logger.debug(`[getAvailableMessageCount] Message count retrieved for connectionId ${connectionId}`, {
         messageCount,
       })
 
       return messageCount
     } catch (error) {
-      // Logs the error and returns 0 if an exception occurs
       this.logger.error('[getAvailableMessageCount] Error retrieving message count', {
         connectionId,
         error: error.message,
@@ -154,65 +158,58 @@ export class WebsocketService {
    * @param {string} [dto.token] - Optional token for sending push notifications.
    * @returns {Promise<{ messageId: string; receivedAt: Date } | undefined>} - A promise that resolves to the message ID and received timestamp or undefined if an error occurs.
    */
-  async addMessage(dto: AddMessageDto): Promise<{ messageId: string; receivedAt: Date } | undefined> {
-    // Ensures the queuedMessage model is initialized before proceeding
-    if (!this.queuedMessage) {
-      throw new Error('[addMessage] messagesCollection is not initialized')
-    }
-
-    const { connectionId, recipientDids, payload, liveSession, token } = dto
-    let messageId: string
+  async addMessage(dto: AddMessageDto): Promise<{ connectionId: string; receivedAt: Date } | undefined> {
+    const { connectionId, recipientDids, payload, token } = dto
     let receivedAt: Date
+    let messageId: string
 
     try {
-      // Adds the new message to the queue with initial state depending on whether it's part of a live session
-      const result = await this.queuedMessage.create({
-        connectionId: connectionId,
-        recipientKeys: recipientDids,
-        encryptedMessage: payload,
-        state: liveSession ? MessageState.sending : MessageState.pending,
-      })
+      // Generate a unique ID for the message
+      messageId = new ObjectId().toString()
+      receivedAt = new Date()
 
-      // Validates that the result contains a valid ObjectId and extracts the timestamp
-      if (result._id instanceof ObjectId) {
-        messageId = result._id.toString()
-        receivedAt = result._id.getTimestamp()
-      } else {
-        throw new Error('[addMessage] Unexpected _id type')
+      // Create a message object to store in Redis
+      const messageData = {
+        messageId,
+        connectionId,
+        recipientDids,
+        encryptedMessage: payload,
+        state: MessageState.pending,
+        receivedAt,
       }
 
-      // If the message is part of a live session or the connection has a live session, publish a message to Redis
-      if (liveSession || (await this.getLiveSession(dto))) {
-        await this.redisPublisher.publish(connectionId, 'new message')
-      } else {
-        // If not in a live session, log and potentially send a push notification
+      // Store the message in Redis using connectionId as the key
+      await this.redis.rpush(`connectionId:${connectionId}:messages`, JSON.stringify(messageData))
+
+      this.logger.debug(`[addMessage] Message stored in Redis for connectionId ${connectionId}`)
+
+      await this.redisPublisher.publish(connectionId, 'new message')
+
+      if (!(await this.getLiveSession(dto))) {
+        // If not in a live session
         this.logger.debug(`[addMessage] connectionId not found in other instance`)
-        this.logger.debug(`[addMessage] Push notification parameters token: ${token}; MessageId: ${messageId}`)
 
         if (token && messageId) {
+          this.logger.debug(`[addMessage] Push notification parameters token: ${token}; MessageId: ${messageId}`)
           await this.sendPushNotification(token, messageId)
         }
       }
-
-      this.logger.debug(
-        `[addMessage] Added message for ${connectionId} with result ${messageId} and receivedAt ${receivedAt}`,
-      )
-
-      return { messageId, receivedAt }
+      return { connectionId, receivedAt }
     } catch (error) {
-      // Logs the error and returns undefined if an exception occurs
-      this.logger.debug(`[addMessage] Error adding message to queue: ${error}`)
+      this.logger.error(`[addMessage] Error adding message to queue: ${error.message}`)
       return undefined
     }
   }
 
+ 
   /**
-   * Removes messages from the queue based on the provided connection ID and message IDs.
+   * Removes messages from both Redis and MongoDB based on the provided connection ID and message IDs.
+   * This method ensures that messages are removed from Redis as well as MongoDB.
    *
    * @param {RemoveMessagesDto} dto - Data transfer object containing the connection ID and message IDs to be removed.
    * @param {string} dto.connectionId - The unique identifier of the connection.
    * @param {string[]} dto.messageIds - Array of message IDs to be removed from the queue.
-   * @returns {Promise<void>} - A promise that resolves once the operation is complete.
+   * @returns {Promise<void>} - No return value, resolves when messages are removed.
    */
   async removeMessages(dto: RemoveMessagesDto): Promise<void> {
     const { connectionId, messageIds } = dto
@@ -220,22 +217,39 @@ export class WebsocketService {
     this.logger.debug('[removeMessages] Method called with DTO:', dto)
 
     try {
-      // Deletes messages from the queue matching the provided connection ID and message IDs
+      // Remove messages from Redis
+      for (const messageId of messageIds) {
+        // remove specific messages from Redis
+        const redisMessage = await this.redis.lrange(`connectionId:${connectionId}:messages`, 0, messageId.length - 1)
+        const messageIndex = redisMessage.findIndex((message) => {
+          this.logger.debug(`*** Message: ${message} ****`)
+          const parsedMessage = JSON.parse(message)
+          return parsedMessage.messageId === messageId
+        })
+        this.logger.debug(`*** MessageIndex: ${messageIndex}***`)
+        // Remove message if found
+        if (messageIndex !== -1) {
+          await this.redis.lrem(`connectionId:${connectionId}:messages`, 1, redisMessage[messageIndex])
+          this.logger.debug(`[removeMessages] Message ${messageId} removed from Redis for connectionId ${connectionId}`)
+        } else {
+          this.logger.warn(`[removeMessages] Message ${messageId} not found in Redis for connectionId ${connectionId}`)
+        }
+      }
+
+      // Remove messages from MongoDB
       const response = await this.queuedMessage.deleteMany({
         connectionId: connectionId,
         _id: { $in: messageIds.map((id) => new Object(id)) },
       })
 
-      this.logger.debug('[removeMessages] Messages removed', {
+      this.logger.debug('[removeMessages] Messages removed from MongoDB', {
         connectionId,
         messageIds,
         deletedCount: response.deletedCount,
       })
-
-      // No return statement needed as the function now returns void
     } catch (error) {
-      // Logs the error but does not return a value
-      this.logger.error('[removeMessages] Error removing messages', {
+      // Log the error
+      this.logger.error('[removeMessages] Error removing messages from Redis and MongoDB', {
         connectionId,
         messageIds,
         error: error.message,

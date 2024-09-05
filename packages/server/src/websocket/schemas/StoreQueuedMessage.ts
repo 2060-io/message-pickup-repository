@@ -5,12 +5,12 @@ import { EncryptedMessage } from '../dto/messagerepository-websocket.dto'
 /**
  * Represents a message queued for delivery, stored in the database.
  *
- * @typedef {HydratedDocument<QueuedMessage>} QueuedMessageDocument - The Mongoose document type for a queued message.
+ * @typedef {HydratedDocument<StoreQueuedMessage>} StoreQueuedMessageDocument - The Mongoose document type for a queued message.
  */
-export type QueuedMessageDocument = HydratedDocument<QueuedMessage>
+export type StoreQueuedMessageDocument = HydratedDocument<StoreQueuedMessage>
 
 @Schema({ timestamps: true })
-export class QueuedMessage extends Document {
+export class StoreQueuedMessage extends Document {
   /**
    * The unique identifier of the connection associated with the queued message.
    * @type {string}
@@ -38,10 +38,23 @@ export class QueuedMessage extends Document {
    */
   @Prop()
   state?: string
+  /**
+   * The timestamp when the message was created.
+   * Mongoose automatically creates this field when `timestamps: true` is set in the schema.
+   * @type {Date}
+   */
+  createdAt?: Date
+
+  /**
+   * The timestamp when the message was last updated.
+   * Mongoose automatically creates this field when `timestamps: true` is set in the schema.
+   * @type {Date}
+   */
+  updatedAt?: Date
 }
 
 /**
  * The schema definition for the QueuedMessage model.
  * Includes timestamps for creation and update times.
  */
-export const QueuedMessageSchema = SchemaFactory.createForClass(QueuedMessage)
+export const StoreQueuedMessageSchema = SchemaFactory.createForClass(StoreQueuedMessage)

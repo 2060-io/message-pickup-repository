@@ -12,7 +12,7 @@ COPY yarn.lock yarn.lock
 RUN yarn install
 
 # Copy other dependencies and configuration files
-COPY ./packages/message-repository/src ./src
+COPY ./packages/server/src ./src
 COPY tsconfig.json tsconfig.json
 
 # Build the project
