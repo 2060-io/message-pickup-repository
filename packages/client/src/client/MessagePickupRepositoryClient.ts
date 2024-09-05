@@ -10,6 +10,7 @@ import {
 } from '@credo-ts/core'
 
 import { AddLiveSessionDto, ConnectionIdDto } from '../dto/client.dto'
+import { StoreLiveSession } from 'packages/server/src/websocket/schemas/StoreLiveSession'
 
 export class MessagePickupRepositoryClient implements MessagePickupRepository {
   private readonly wsClient: Client
@@ -118,7 +119,6 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
     try {
       const result: unknown = await this.wsClient.call('removeMessages', params, 2000)
 
-      // Si el resultado no es undefined o null, puedes lanzar un error (dependiendo de tu lógica)
       if (result !== undefined && result !== null) {
         throw new Error('Unexpected result for removeMessages')
       }
@@ -130,12 +130,24 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
 
   /**
    * Call the 'getLiveSession' RPC method.
+   * This method retrieves the live session data from the WebSocket server.
+   * It expects the response to be a `StoreLiveSession` object or `null`.
+   *
    * @param params - Parameters to pass to the 'getLiveSession' method.
-   * @returns {Promise<any>} - The live session data.
+   * @returns {Promise<StoreLiveSession | null>} - The live session data.
    */
-  async getLiveSession(params: ConnectionIdDto): Promise<any> {
+  async getLiveSession(params: ConnectionIdDto): Promise<StoreLiveSession | null> {
     try {
-      return await this.wsClient.call('getLiveSession', params, 2000)
+      const result: unknown = await this.wsClient.call('getLiveSession', params, 2000)
+
+      // Check if the result is an object or null
+      if (result && typeof result === 'object') {
+        return result as StoreLiveSession
+      } else if (result === null) {
+        return null
+      } else {
+        throw new Error('Unexpected result: Expected an object or null')
+      }
     } catch (error) {
       this.logger.error('Error calling getLiveSession:', error)
       throw error
@@ -144,13 +156,25 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
 
   /**
    * Call the 'addLiveSession' RPC method.
+   * This method sends a request to the WebSocket server to add a live session.
+   * It expects the response to be a boolean indicating success or failure.
+   *
    * @param params - Parameters to pass to the 'addLiveSession' method.
-   * @returns {Promise<any>} - The result from the WebSocket server.
+   * @returns {Promise<boolean>} - The result from the WebSocket server, expected to be a boolean.
+   * @throws Will throw an error if the result is not a boolean or if there's any issue with the WebSocket call.
    */
-  async addLiveSession(params: AddLiveSessionDto): Promise<any> {
+  async addLiveSession(params: AddLiveSessionDto): Promise<boolean> {
     try {
-      return await this.wsClient.call('addLiveSession', params, 2000)
+      const result: unknown = await this.wsClient.call('addLiveSession', params, 2000)
+
+      // Check if the result is a boolean and return it
+      if (typeof result === 'boolean') {
+        return result
+      } else {
+        throw new Error('Unexpected result: Expected a boolean value')
+      }
     } catch (error) {
+      // Log the error and rethrow it for further handling
       this.logger.error('Error calling addLiveSession:', error)
       throw error
     }
@@ -159,11 +183,18 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   /**
    * Call the 'removeLiveSession' RPC method.
    * @param params - Parameters to pass to the 'removeLiveSession' method.
-   * @returns {Promise<any>} - The result from the WebSocket server.
+   * @returns {Promise<boolean>} - The result from the WebSocket server.
    */
-  async removeLiveSession(params: ConnectionIdDto): Promise<any> {
+  async removeLiveSession(params: ConnectionIdDto): Promise<boolean> {
     try {
-      return await this.wsClient.call('removeLiveSession', params, 2000)
+      const result: unknown = await this.wsClient.call('removeLiveSession', params, 2000)
+
+      // Check if the result is a boolean and return it
+      if (typeof result === 'boolean') {
+        return result
+      } else {
+        throw new Error('Unexpected result: Expected a boolean value')
+      }
     } catch (error) {
       this.logger.error('Error calling removeLiveSession:', error)
       throw error

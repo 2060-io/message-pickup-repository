@@ -17,7 +17,4 @@ export class AddLiveSessionDto {
 
   @IsNotEmpty({ message: 'sessionId is required' })
   sessionId: string
-
-  @IsNotEmpty({ message: 'instance is required' })
-  instance: string
 }
