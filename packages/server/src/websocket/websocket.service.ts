@@ -212,9 +212,9 @@ export class WebsocketService {
    * @param {RemoveMessagesDto} dto - Data transfer object containing the connection ID and message IDs to be removed.
    * @param {string} dto.connectionId - The unique identifier of the connection.
    * @param {string[]} dto.messageIds - Array of message IDs to be removed from the queue.
-   * @returns {Promise<number>} - A promise that resolves to the number of deleted messages, or -1 if an error occurs.
+   * @returns {Promise<void>} - A promise that resolves once the operation is complete.
    */
-  async removeMessages(dto: RemoveMessagesDto): Promise<number> {
+  async removeMessages(dto: RemoveMessagesDto): Promise<void> {
     const { connectionId, messageIds } = dto
 
     this.logger.debug('[removeMessages] Method called with DTO:', dto)
@@ -232,15 +232,15 @@ export class WebsocketService {
         deletedCount: response.deletedCount,
       })
 
-      return response.deletedCount
+      // No return statement needed as the function now returns void
     } catch (error) {
-      // Logs the error and returns -1 if an exception occurs
+      // Logs the error but does not return a value
       this.logger.error('[removeMessages] Error removing messages', {
         connectionId,
         messageIds,
         error: error.message,
       })
-      return -1
+      throw error
     }
   }
 

@@ -82,17 +82,3 @@ export class AddLiveSessionDto {
   @IsNotEmpty()
   instance: string
 }
-
-export class InstanceRegistrationDto {
-  @IsNotEmpty()
-  @IsString()
-  connectionId: string
-
-  @IsNotEmpty()
-  @IsString()
-  ip: string
-
-  @IsNotEmpty()
-  @IsString()
-  dns: string
-}

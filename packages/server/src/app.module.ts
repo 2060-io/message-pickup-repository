@@ -2,8 +2,8 @@ import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { WebsocketModule } from './websocket/websocket.module'
 import { HandledRedisModule } from './modules/redis.module'
-import appConfig from './config/app.config'
 import { HandledMongooseModule } from './modules/mongo.module'
+import appConfig from './config/app.config'
 
 @Module({
   imports: [

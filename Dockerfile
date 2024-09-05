@@ -1,6 +1,7 @@
 FROM node:22-alpine3.20 as base
 
-# message-pickup-repository Setup
+
+# MSM Setup
 WORKDIR /app
 
 # Copy package.json and yarn.lock first to leverage Docker layer caching
@@ -11,9 +12,8 @@ COPY yarn.lock yarn.lock
 RUN yarn install
 
 # Copy other dependencies and configuration files
-COPY ./src ./src
+COPY ./packages/message-repository/src ./src
 COPY tsconfig.json tsconfig.json
-COPY tsconfig.build.json tsconfig.build.json
 
 # Build the project
 RUN yarn build

@@ -1,4 +1,4 @@
-import { MessagePickupRepositoryClient } from './MessagePickupRepositoryClient'
+import { MessagePickupRepositoryClient } from '../src/client/MessagePickupRepositoryClient'
 import { Logger } from '@nestjs/common'
 
 const logger = new Logger('WebSocketTestScript')
