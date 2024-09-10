@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common'
-import { MessagePickupRepositoryClient } from './client/MessagePickupRepositoryClient'
+import { MessagePickupRepositoryClient } from './lib/MessagePickupRepositoryClient'
 
 @Module({
   imports: [],

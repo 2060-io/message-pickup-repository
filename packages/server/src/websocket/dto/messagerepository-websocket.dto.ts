@@ -78,7 +78,4 @@ export class AddLiveSessionDto {
 
   @IsNotEmpty()
   sessionId: string
-
-  @IsNotEmpty()
-  instance: string
 }

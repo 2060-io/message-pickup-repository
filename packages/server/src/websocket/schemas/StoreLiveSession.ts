@@ -23,13 +23,6 @@ export class StoreLiveSession extends Document {
    */
   @Prop({ required: true })
   sessionId: string
-
-  /**
-   * The instance identifier where the live session is active.
-   * @type {string}
-   */
-  @Prop({ required: true })
-  instance: string
 }
 
 /**

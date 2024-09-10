@@ -13,12 +13,13 @@ import {
 } from './dto/messagerepository-websocket.dto'
 import { StoreLiveSession } from './schemas/StoreLiveSession'
 import { StoreQueuedMessage } from './schemas/StoreQueuedMessage'
-import { InstanceRegistration } from './schemas/InstanceRegistration'
 import { InjectRedis } from '@nestjs-modules/ioredis'
 import { lastValueFrom } from 'rxjs'
 import { HttpService } from '@nestjs/axios'
 import { QueuedMessage } from '@credo-ts/core'
+import { Client, Server } from 'rpc-websockets'
 import Redis from 'ioredis'
+import { RpcSendResponse } from './interfaces/interfaces'
 
 @Injectable()
 export class WebsocketService {
@@ -26,11 +27,11 @@ export class WebsocketService {
   private readonly httpService: HttpService
   private readonly redisSubscriber: Redis
   private readonly redisPublisher: Redis
+  private server: Server
 
   constructor(
     @InjectModel(StoreQueuedMessage.name) private queuedMessage: Model<StoreQueuedMessage>,
     @InjectModel(StoreLiveSession.name) private storeLiveSession: Model<StoreLiveSession>,
-    @InjectModel(InstanceRegistration.name) private instanceRegistration: Model<InstanceRegistration>,
     @InjectRedis() private readonly redis: Redis,
     private configService: ConfigService,
   ) {
@@ -46,6 +47,10 @@ export class WebsocketService {
     } catch (error) {
       this.logger.error('Failed to connect to Redis:', error.message)
     }
+  }
+
+  setServer(server: Server) {
+    this.server = server
   }
 
   /**
@@ -66,7 +71,7 @@ export class WebsocketService {
 
     try {
       // Retrieve messages from Redis
-      const redisMessagesRaw = await this.redis.lrange(`connectionId:${connectionId}:messages`, 0, limit - 1)
+      const redisMessagesRaw = await this.redis.lrange(`connectionId:${connectionId}:queuemessages`, 0, limit - 1)
       const redisMessages: QueuedMessage[] = redisMessagesRaw.map((message) => {
         const parsedMessage = JSON.parse(message)
 
@@ -131,7 +136,7 @@ export class WebsocketService {
 
     try {
       // retrieve the list count of messages for the connection
-      const messageCount = await this.redis.llen(`connectionId:${connectionId}:messages`)
+      const messageCount = await this.redis.llen(`connectionId:${connectionId}:queuemessages`)
 
       this.logger.debug(`[getAvailableMessageCount] Message count retrieved for connectionId ${connectionId}`, {
         messageCount,
@@ -179,11 +184,18 @@ export class WebsocketService {
       }
 
       // Store the message in Redis using connectionId as the key
-      await this.redis.rpush(`connectionId:${connectionId}:messages`, JSON.stringify(messageData))
+      await this.redis.rpush(`connectionId:${connectionId}:queuemessages`, JSON.stringify(messageData))
+
+      // test send message to publish channel connection id
+      const messagePublish = {
+        id: messageId,
+        receivedAt,
+        encryptedMessage: payload,
+      }
 
       this.logger.debug(`[addMessage] Message stored in Redis for connectionId ${connectionId}`)
 
-      await this.redisPublisher.publish(connectionId, 'new message')
+      await this.redisPublisher.publish(connectionId, JSON.stringify(messagePublish))
 
       if (!(await this.getLiveSession(dto))) {
         // If not in a live session
@@ -191,7 +203,7 @@ export class WebsocketService {
 
         if (token && messageId) {
           this.logger.debug(`[addMessage] Push notification parameters token: ${token}; MessageId: ${messageId}`)
-          await this.sendPushNotification(token, messageId)
+          //await this.sendPushNotification(token, messageId)
         }
       }
       return { connectionId, receivedAt }
@@ -201,7 +213,6 @@ export class WebsocketService {
     }
   }
 
- 
   /**
    * Removes messages from both Redis and MongoDB based on the provided connection ID and message IDs.
    * This method ensures that messages are removed from Redis as well as MongoDB.
@@ -220,7 +231,11 @@ export class WebsocketService {
       // Remove messages from Redis
       for (const messageId of messageIds) {
         // remove specific messages from Redis
-        const redisMessage = await this.redis.lrange(`connectionId:${connectionId}:messages`, 0, messageId.length - 1)
+        const redisMessage = await this.redis.lrange(
+          `connectionId:${connectionId}:queuemessages`,
+          0,
+          messageId.length - 1,
+        )
         const messageIndex = redisMessage.findIndex((message) => {
           this.logger.debug(`*** Message: ${message} ****`)
           const parsedMessage = JSON.parse(message)
@@ -229,7 +244,7 @@ export class WebsocketService {
         this.logger.debug(`*** MessageIndex: ${messageIndex}***`)
         // Remove message if found
         if (messageIndex !== -1) {
-          await this.redis.lrem(`connectionId:${connectionId}:messages`, 1, redisMessage[messageIndex])
+          await this.redis.lrem(`connectionId:${connectionId}:queuemessages`, 1, redisMessage[messageIndex])
           this.logger.debug(`[removeMessages] Message ${messageId} removed from Redis for connectionId ${connectionId}`)
         } else {
           this.logger.warn(`[removeMessages] Message ${messageId} not found in Redis for connectionId ${connectionId}`)
@@ -263,30 +278,30 @@ export class WebsocketService {
    *
    * @param {ConnectionIdDto} dto - Data transfer object containing the connection ID.
    * @param {string} dto.connectionId - The unique identifier of the connection.
-   * @returns {Promise<StoreLiveSession | null>} - A promise that resolves to the live session if found, or null if not found or an error occurs.
+   * @returns {Promise<boolean>} - A promise that resolves true the livesession if found, or false if not found or  null an error occurs.
    */
-  async getLiveSession(dto: ConnectionIdDto): Promise<StoreLiveSession | null> {
+  async getLiveSession(dto: ConnectionIdDto): Promise<boolean> {
     const { connectionId } = dto
 
-    this.logger.debug('[getLiveSession] Initializing find registry for connectionId', { connectionId })
+    this.logger.debug('[getLiveSession] Looking up live session in Redis for connectionId', { connectionId })
 
     try {
-      // Attempts to find the live session associated with the given connection ID
-      const liveSession = await this.storeLiveSession.findOne({ connectionId })
+      // Define the Redis key where the live session is stored
+      const sessionKey = `liveSession:${connectionId}`
 
-      if (liveSession) {
-        // If a live session is found, logs the event and publishes a 'new message' event to Redis
-        this.logger.debug('[getLiveSession] Record found for connectionId', { connectionId })
-        await this.redis.publish(connectionId, 'new message')
-        return liveSession
+      // Attempt to retrieve the session from Redis
+      const liveSessionData = await this.redis.hgetall(sessionKey)
+
+      if (liveSessionData && liveSessionData.sessionId) {
+        this.logger.debug('[getLiveSession] Live session found in Redis', { liveSessionData })
+
+        return true
       } else {
-        // If no live session is found, logs the event and returns null
-        this.logger.debug('[getLiveSession] No record found for connectionId', { connectionId })
-        return null
+        this.logger.debug('[getLiveSession] No live session found in Redis for connectionId', { connectionId })
+        return false
       }
     } catch (error) {
-      // Logs any errors encountered during the process and returns null
-      this.logger.error('[getLiveSession] Error finding live session for connectionId', {
+      this.logger.error('[getLiveSession] Error retrieving live session from Redis', {
         connectionId,
         error: error.message,
       })
@@ -303,26 +318,25 @@ export class WebsocketService {
    * @param {string} dto.instance - The instance identifier where the session is active.
    * @returns {Promise<boolean>} - A promise that resolves to true if the live session is added successfully, or false if an error occurs.
    */
-  async addLiveSession(dto: AddLiveSessionDto): Promise<boolean> {
-    const { connectionId, sessionId, instance } = dto
+  async addLiveSession(dto: AddLiveSessionDto, socket_id: string): Promise<boolean> {
+    const { connectionId, sessionId } = dto
 
     this.logger.debug('[addLiveSession] Initializing add LiveSession to DB', {
       connectionId,
       sessionId,
-      instance,
     })
 
+    this.logger.debug('[addLiveSession] socket_id:', { socket_id })
     try {
-      // Attempts to create a new live session record in the database
-      const response = await this.storeLiveSession.create({
+      // Attempts to create a new live session record in the redis
+      const sessionKey = `liveSession:${connectionId}`
+      const response = await this.redis.hmset(sessionKey, {
         sessionId,
-        connectionId,
-        instance,
       })
 
       this.logger.debug('[addLiveSession] response:', { response })
 
-      if (response) {
+      if (response === 'OK') {
         this.logger.log('[addLiveSession] LiveSession added successfully', { connectionId })
 
         // Subscribes to the Redis channel for the connection ID
@@ -332,12 +346,17 @@ export class WebsocketService {
         })
 
         // Handles messages received on the subscribed Redis channel
-        this.redisSubscriber.on('message', (channel: string, message: string) => {
+        this.redisSubscriber.on('message', (channel: string, message: QueuedMessage[]) => {
           if (channel === connectionId) {
-            this.logger.log(`** Received message from ${channel}: ${message} **`)
-            // TODO: Handle the new message for the connectionId
-            //this.takeFromQueue()
-            //Client.notify('messageReceipt',option{connectionId,this.queuedMessage})
+            this.logger.log(`*** [redisSubscriber] Received message from ${channel}: ${message} **`)
+
+            const jsonRpcResponse: RpcSendResponse = {
+              jsonrpc: '2.0',
+              result: message,
+              id: dto.id,
+            }
+
+            this.sendMessageToClientById(socket_id, jsonRpcResponse)
           }
         })
         return true
@@ -365,30 +384,29 @@ export class WebsocketService {
   async removeLiveSession(dto: ConnectionIdDto): Promise<boolean> {
     const { connectionId } = dto
 
-    this.logger.debug('[removeLiveSession] Initializing remove LiveSession', { connectionId })
+    this.logger.debug('[removeLiveSession] Initializing removal of LiveSession from Redis', { connectionId })
 
     try {
-      // Attempts to delete the live session(s) associated with the given connection ID
-      const response = await this.storeLiveSession.deleteMany({ connectionId })
+      // Define the Redis key where the live session is stored
+      const sessionKey = `liveSession:${connectionId}`
 
-      this.logger.debug('[removeLiveSession] Delete response', { response })
+      // Attempt to delete the live session from Redis
+      const deleteResult = await this.redis.del(sessionKey)
 
-      if (response.deletedCount > 0) {
-        this.logger.debug('[removeLiveSession] LiveSession removed successfully', { connectionId })
+      if (deleteResult > 0) {
+        this.logger.debug('[removeLiveSession] LiveSession removed successfully from Redis', { connectionId })
 
-        // Checks for any pending messages in the queue after removing the live session
-        this.checkPendingMessagesInQueue(dto)
+        // Unsubscribe from the Redis channel for the connection ID
+        await this.redisSubscriber.unsubscribe(connectionId)
 
-        // Unsubscribes from the Redis channel for the connection ID
-        this.redisSubscriber.unsubscribe(connectionId)
+        this.logger.debug('[removeLiveSession] Unsubscribed from Redis channel', { connectionId })
         return true
       } else {
-        this.logger.debug('[removeLiveSession] No LiveSession found for connectionId', { connectionId })
+        this.logger.debug('[removeLiveSession] No LiveSession found in Redis for connectionId', { connectionId })
         return false
       }
     } catch (error) {
-      // Logs any errors encountered during the process and returns false
-      this.logger.error('[removeLiveSession] Error removing LiveSession', {
+      this.logger.error('[removeLiveSession] Error removing LiveSession from Redis', {
         connectionId,
         error: error.message,
       })
@@ -489,6 +507,54 @@ export class WebsocketService {
         error: error.message,
       })
       return -1
+    }
+  }
+
+  /**
+   * Sends a message to a WebSocket client identified by its socket ID.
+   * The function iterates over all connected WebSocket clients and checks if the client's ID matches
+   * the given `socket_id`. If the client is found and its connection is open, the message is sent.
+   *
+   * @param {string} socket_id - The unique identifier of the WebSocket client to which the message will be sent.
+   * @param {string} message - The message that will be sent to the WebSocket client.
+   *
+   * @returns {void}
+   *
+   * @throws {Error} If an error occurs during message transmission.
+   */
+  async sendMessageToClientById(socket_id: string, message: RpcSendResponse): Promise<void> {
+    try {
+      this.logger.debug(`[sendMessageToClientById] Sending message to WebSocket client: ${socket_id}`)
+      let clientFound = false // Track if the client was found
+
+      // Iterate over all connected WebSocket clients
+      this.server.wss.clients.forEach(async (client) => {
+        this.logger.debug(`[sendMessageToClientById] Find WebSocket client: ${JSON.stringify((client as any)._id)}}`)
+        // Check if the client's ID matches the provided socket_id and if the connection is open
+
+        if ((client as any)._id === socket_id && client.readyState === 1) {
+          clientFound = true
+          this.logger.debug(`[sendMessageToClientById] Sending message to WebSocket client: ${socket_id}`)
+
+          // Send the message to the client
+          const sendMessage = client.send(JSON.stringify(message), (error) => {
+            this.logger.debug(`*** Error send: ${error}`)
+          })
+
+          this.logger.log(
+            `[sendMessageToClientById] Message sent successfully ${sendMessage} to client with ID: ${socket_id}`,
+          )
+        }
+      })
+
+      // Log a warning if no client was found with the given socket_id
+      if (!clientFound) {
+        this.logger.warn(`[sendMessageToClientById] No WebSocket client found with ID: ${socket_id}`)
+      }
+    } catch (error) {
+      // Log and throw an error if something goes wrong during the operation
+      this.logger.error(`[sendMessageToClientById] Failed to send message to client with ID: ${socket_id}`, error.stack)
+      throw new Error(`[sendMessageToClientById] Failed to send message: ${error.message}`)
     }
   }
 }

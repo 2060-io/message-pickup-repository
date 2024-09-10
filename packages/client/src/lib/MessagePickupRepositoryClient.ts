@@ -15,6 +15,7 @@ import { StoreLiveSession } from 'packages/server/src/websocket/schemas/StoreLiv
 export class MessagePickupRepositoryClient implements MessagePickupRepository {
   private readonly wsClient: Client
   private readonly logger = new Logger(MessagePickupRepositoryClient.name)
+  private messageReceivedCallback: ((data: any) => void) | null = null
 
   constructor(private readonly url: string) {
     this.wsClient = new Client(this.url)
@@ -28,6 +29,15 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
     return new Promise((resolve, reject) => {
       this.wsClient.on('open', () => {
         this.logger.log('Connected to WebSocket server')
+
+        // Set up listener for 'messageReceive' event
+        this.wsClient.on('messageReceive', (data: any) => {
+          if (this.messageReceivedCallback) {
+            this.messageReceivedCallback(data)
+          } else {
+            this.logger.log('Received messageReceive event, but no callback is registered:', data)
+          }
+        })
         resolve()
       })
 
@@ -36,6 +46,14 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
         reject(error)
       })
     })
+  }
+
+  /**
+   * Register a callback function for the 'messageReceive' event.
+   * @param callback - The callback function to be invoked when 'messageReceive' is triggered.
+   */
+  messageReceived(callback: (data: any) => void): void {
+    this.messageReceivedCallback = callback
   }
 
   /**

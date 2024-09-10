@@ -12,6 +12,12 @@ export type StoreQueuedMessageDocument = HydratedDocument<StoreQueuedMessage>
 @Schema({ timestamps: true })
 export class StoreQueuedMessage extends Document {
   /**
+   * The unique identifier of the message add with the queued message.
+   * @type {string}
+   */
+  @Prop({ required: true, index: 1 })
+  messageId: string
+  /**
    * The unique identifier of the connection associated with the queued message.
    * @type {string}
    */

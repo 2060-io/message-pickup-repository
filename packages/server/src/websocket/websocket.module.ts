@@ -4,16 +4,15 @@ import { WebsocketGateway } from './websocket.gateway'
 import { MongooseModule } from '@nestjs/mongoose'
 import { StoreQueuedMessageSchema, StoreQueuedMessage } from './schemas/StoreQueuedMessage'
 import { StoreLiveSessionSchema, StoreLiveSession } from './schemas/StoreLiveSession'
-import { InstanceRegistration, InstanceRegistrationSchema } from './schemas/InstanceRegistration'
+import { MessagePersister } from './services/MessagePersister'
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: StoreQueuedMessage.name, schema: StoreQueuedMessageSchema },
       { name: StoreLiveSession.name, schema: StoreLiveSessionSchema },
-      { name: InstanceRegistration.name, schema: InstanceRegistrationSchema },
     ]),
   ],
-  providers: [WebsocketGateway, WebsocketService],
+  providers: [WebsocketGateway, WebsocketService, MessagePersister],
 })
 export class WebsocketModule {}
