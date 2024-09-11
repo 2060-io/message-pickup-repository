@@ -42,4 +42,6 @@ export default registerAs('appConfig', () => ({
   redisDbUrl: process.env.REDIS_URL || 'redis://192.168.100.84:6379',
 
   redisType: process.env.REDIS_TYPE || 'cluster',
+
+  thresholdTimestamp: parseInt(process.env.THRESHOLD_TIMESTAMP) || 60000,
 }))

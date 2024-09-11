@@ -11,15 +11,14 @@ import {
   ConnectionIdDto,
   AddLiveSessionDto,
 } from './dto/messagerepository-websocket.dto'
-import { StoreLiveSession } from './schemas/StoreLiveSession'
 import { StoreQueuedMessage } from './schemas/StoreQueuedMessage'
 import { InjectRedis } from '@nestjs-modules/ioredis'
 import { lastValueFrom } from 'rxjs'
 import { HttpService } from '@nestjs/axios'
 import { QueuedMessage } from '@credo-ts/core'
-import { Client, Server } from 'rpc-websockets'
+import { Server } from 'rpc-websockets'
 import Redis from 'ioredis'
-import { RpcSendResponse } from './interfaces/interfaces'
+import { JsonRpcResponseSubscriber } from './interfaces/interfaces'
 
 @Injectable()
 export class WebsocketService {
@@ -31,7 +30,6 @@ export class WebsocketService {
 
   constructor(
     @InjectModel(StoreQueuedMessage.name) private queuedMessage: Model<StoreQueuedMessage>,
-    @InjectModel(StoreLiveSession.name) private storeLiveSession: Model<StoreLiveSession>,
     @InjectRedis() private readonly redis: Redis,
     private configService: ConfigService,
   ) {
@@ -95,12 +93,12 @@ export class WebsocketService {
         })
         .sort({ createdAt: 1 })
         .limit(limit)
-        .select({ _id: 1, encryptedMessage: 1, createdAt: 1 })
+        .select({ messageId: 1, encryptedMessage: 1, createdAt: 1 })
         .lean()
         .exec()
 
       const mongoMappedMessages: QueuedMessage[] = mongoMessages.map((msg) => ({
-        id: msg._id.toString(),
+        id: msg.messageId.toString(),
         receivedAt: msg.createdAt,
         encryptedMessage: msg.encryptedMessage,
       }))
@@ -163,7 +161,7 @@ export class WebsocketService {
    * @param {string} [dto.token] - Optional token for sending push notifications.
    * @returns {Promise<{ messageId: string; receivedAt: Date } | undefined>} - A promise that resolves to the message ID and received timestamp or undefined if an error occurs.
    */
-  async addMessage(dto: AddMessageDto): Promise<{ connectionId: string; receivedAt: Date } | undefined> {
+  async addMessage(dto: AddMessageDto): Promise<{ messageId: string } | undefined> {
     const { connectionId, recipientDids, payload, token } = dto
     let receivedAt: Date
     let messageId: string
@@ -203,10 +201,10 @@ export class WebsocketService {
 
         if (token && messageId) {
           this.logger.debug(`[addMessage] Push notification parameters token: ${token}; MessageId: ${messageId}`)
-          //await this.sendPushNotification(token, messageId)
+          await this.sendPushNotification(token, messageId)
         }
       }
-      return { connectionId, receivedAt }
+      return { messageId }
     } catch (error) {
       this.logger.error(`[addMessage] Error adding message to queue: ${error.message}`)
       return undefined
@@ -350,10 +348,14 @@ export class WebsocketService {
           if (channel === connectionId) {
             this.logger.log(`*** [redisSubscriber] Received message from ${channel}: ${message} **`)
 
-            const jsonRpcResponse: RpcSendResponse = {
+            const jsonRpcResponse: JsonRpcResponseSubscriber = {
               jsonrpc: '2.0',
-              result: message,
-              id: dto.id,
+              method: 'messageReceive',
+              params: {
+                connectionId,
+                message,
+                id: dto.id,
+              },
             }
 
             this.sendMessageToClientById(socket_id, jsonRpcResponse)
@@ -522,7 +524,7 @@ export class WebsocketService {
    *
    * @throws {Error} If an error occurs during message transmission.
    */
-  async sendMessageToClientById(socket_id: string, message: RpcSendResponse): Promise<void> {
+  async sendMessageToClientById(socket_id: string, message: JsonRpcResponseSubscriber): Promise<void> {
     try {
       this.logger.debug(`[sendMessageToClientById] Sending message to WebSocket client: ${socket_id}`)
       let clientFound = false // Track if the client was found
