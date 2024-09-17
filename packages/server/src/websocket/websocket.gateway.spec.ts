@@ -1,51 +1,65 @@
 import { Test, TestingModule } from '@nestjs/testing'
+import { WebsocketGateway } from './websocket.gateway'
 import { WebsocketService } from './websocket.service'
-import { getModelToken } from '@nestjs/mongoose'
-import { ConfigService } from '@nestjs/config'
-import Redis from 'ioredis'
+import { Server } from 'rpc-websockets'
 
-describe('WebsocketService', () => {
-  let service: WebsocketService
-
-  // Mocks de los modelos de Mongoose
-  const mockQueuedMessageModel = {
-    find: jest.fn(),
-    create: jest.fn(),
-    deleteMany: jest.fn(),
-  }
-
-  const mockLiveSessionModel = {
-    findOne: jest.fn(),
-    create: jest.fn(),
-    deleteMany: jest.fn(),
-  }
-
-  const mockConfigService = {
-    get: jest.fn().mockReturnValue('some-value'),
-  }
-
-  const mockRedisClient = {
-    on: jest.fn(),
-    get: jest.fn(),
-    set: jest.fn(),
-    del: jest.fn(),
-  }
+describe('WebsocketGateway', () => {
+  let gateway: WebsocketGateway
+  let websocketService: WebsocketService
+  let serverMock: Server
 
   beforeEach(async () => {
+    serverMock = new Server({ port: 0 }) as jest.Mocked<Server>
+    jest.spyOn(serverMock, 'event').mockImplementation()
+    jest.spyOn(serverMock, 'register').mockImplementation()
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        WebsocketService,
-        { provide: getModelToken('StoreQueuedMessage'), useValue: mockQueuedMessageModel },
-        { provide: getModelToken('StoreLiveSession'), useValue: mockLiveSessionModel },
-        { provide: ConfigService, useValue: mockConfigService },
-        { provide: Redis, useValue: mockRedisClient },
+        WebsocketGateway,
+        {
+          provide: WebsocketService,
+          useValue: {
+            setServer: jest.fn(),
+            // Mock other methods as needed
+          },
+        },
       ],
     }).compile()
 
-    service = module.get<WebsocketService>(WebsocketService)
+    gateway = module.get<WebsocketGateway>(WebsocketGateway)
+    websocketService = module.get<WebsocketService>(WebsocketService)
+
+    // Injecting the mocked server into the gateway
+    gateway['server'] = serverMock
+  })
+
+  afterEach(async () => {
+    // Close the WebSocket server
+    if (serverMock) {
+      serverMock.close()
+    }
   })
 
   it('should be defined', () => {
-    expect(service).toBeDefined()
+    expect(gateway).toBeDefined()
+  })
+
+  it('should handle a WebSocket client connection', () => {
+    // Mock implementation for the server 'on' method to handle 'connection' events
+    const connectionCallback = jest.fn()
+    jest.spyOn(serverMock, 'on').mockImplementation((event, callback) => {
+      if (event === 'connection') {
+        connectionCallback.mockImplementation(callback)
+      }
+      return serverMock // Return the mock server to match the expected return type
+    })
+
+    // Simulate a connection event
+    const mockClient = { id: 'test-client-id' } // Mock client object
+    connectionCallback(mockClient)
+
+    // Verify that the connection was handled correctly
+    expect(connectionCallback).toHaveBeenCalledWith(mockClient)
+    expect(connectionCallback).toHaveBeenCalledTimes(1)
   })
 })

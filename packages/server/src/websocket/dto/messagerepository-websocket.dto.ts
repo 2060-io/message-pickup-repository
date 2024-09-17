@@ -50,9 +50,6 @@ export class AddMessageDto {
   payload: EncryptedMessage
 
   @IsOptional()
-  liveSession: any
-
-  @IsOptional()
   token: string
 }
 

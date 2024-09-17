@@ -98,7 +98,7 @@ export class WebsocketService {
         .exec()
 
       const mongoMappedMessages: QueuedMessage[] = mongoMessages.map((msg) => ({
-        id: msg.messageId.toString(),
+        id: msg.messageId,
         receivedAt: msg.createdAt,
         encryptedMessage: msg.encryptedMessage,
       }))
