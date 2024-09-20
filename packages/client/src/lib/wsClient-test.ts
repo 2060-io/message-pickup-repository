@@ -5,7 +5,7 @@ const logger = new Logger('WebSocketTestScript')
 
 ;(async () => {
   logger.log(`*** Begin testing *** \n`)
-  const client = new MessagePickupRepositoryClient('ws://localhost:3100') // Asegúrate de que esta sea la URL correcta para tu WebSocket
+  const client = new MessagePickupRepositoryClient('ws://localhost:3100')
   await client.connect()
 
   client.messageReceived((data) => {

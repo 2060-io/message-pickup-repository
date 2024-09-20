@@ -67,7 +67,7 @@ export class WebsocketGateway implements OnModuleInit, OnModuleDestroy {
         result: 'error',
         id: 1,
       })
-      this.logger.log(`WebSocket server listening on port ${WS_PORT}`)
+      this.logger.error(`WebSocket server listening on port ${WS_PORT}`)
     } catch (error) {
       this.logger.error('Error during WebSocket server initialization', error.stack)
       throw error
@@ -103,7 +103,7 @@ export class WebsocketGateway implements OnModuleInit, OnModuleDestroy {
           const result = await this.websocketService.addMessage(params)
           return result
         } catch (error) {
-          this.logger.error('Error in addMessage method', error.stack)
+          this.logger.log('Error in addMessage method', error.stack)
           throw this.server.createError(500, 'Internal server error', { details: error.message })
         }
       })
@@ -146,6 +146,7 @@ export class WebsocketGateway implements OnModuleInit, OnModuleDestroy {
       })
 
       this.server.register('ping', async () => {
+        this.logger.log(`Initialize test ping`)
         return 'pong'
       })
     } catch (error) {
@@ -160,7 +161,7 @@ export class WebsocketGateway implements OnModuleInit, OnModuleDestroy {
   private listenersEvent(): void {
     try {
       this.server.on('connection', (request) => {
-        this.logger.log(`Client connected: ${JSON.stringify(request, null, 2)}`)
+        this.logger.log(`Client connected  ${request}`)
       })
 
       this.server.on('disconnection', (request) => {

@@ -63,7 +63,7 @@ export class WebsocketService {
    * @returns {Promise<QueuedMessage[]>} - A promise that resolves to an array of queued messages.
    */
   async takeFromQueue(dto: TakeFromQueueDto): Promise<QueuedMessage[]> {
-    const { connectionId, limit = 10, deleteMessages, recipientDid } = dto
+    const { connectionId, limit = 10, recipientDid } = dto
 
     this.logger.debug('[takeFromQueue] Method called with DTO:', dto)
 

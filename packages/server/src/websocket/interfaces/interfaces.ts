@@ -7,7 +7,7 @@ export interface JsonRpcParams {
 }
 
 export interface JsonRpcResponseSubscriber {
-  jsonrpc: '2.0' 
+  jsonrpc: '2.0'
   method: 'messageReceive'
   params: JsonRpcParams
 }

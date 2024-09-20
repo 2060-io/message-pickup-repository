@@ -5,7 +5,6 @@ import { Server } from 'rpc-websockets'
 
 describe('WebsocketGateway', () => {
   let gateway: WebsocketGateway
-  let websocketService: WebsocketService
   let serverMock: Server
 
   beforeEach(async () => {
@@ -20,14 +19,12 @@ describe('WebsocketGateway', () => {
           provide: WebsocketService,
           useValue: {
             setServer: jest.fn(),
-            // Mock other methods as needed
           },
         },
       ],
     }).compile()
 
     gateway = module.get<WebsocketGateway>(WebsocketGateway)
-    websocketService = module.get<WebsocketService>(WebsocketService)
 
     // Injecting the mocked server into the gateway
     gateway['server'] = serverMock
@@ -55,7 +52,7 @@ describe('WebsocketGateway', () => {
     })
 
     // Simulate a connection event
-    const mockClient = { id: 'test-client-id' } // Mock client object
+    const mockClient = { id: 'test-client-id' }
     connectionCallback(mockClient)
 
     // Verify that the connection was handled correctly
