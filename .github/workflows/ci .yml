@@ -1,0 +1,52 @@
+name: Continuous Integration
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout message-pickup-repository
+        uses: actions/checkout@v4
+
+      - name: Setup node v22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        working-directory: packages/server
+        run: |
+          yarn install
+
+      - name: Check Format
+        working-directory: packages/server
+        run: |
+          yarn format
+
+      - name: Check Types
+        working-directory: packages/server
+        run: |
+          yarn check-types
+
+      - name: Build
+        working-directory: packages/server
+        run: |
+          yarn build
+
+      - name: Unit tests
+        working-directory: packages/server
+        run: |
+          yarn test
+
+      - name: E2E tests
+        working-directory: packages/server
+        run: |
+          yarn test:e2e
