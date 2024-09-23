@@ -76,3 +76,15 @@ export class AddLiveSessionDto {
   @IsNotEmpty()
   sessionId: string
 }
+
+export class RemoveAllMessagesDto {
+  @IsNotEmpty()
+  id: string
+
+  @IsNotEmpty()
+  connectionId: string
+
+  @IsNotEmpty()
+  @IsString()
+  recipientDid: string
+}

@@ -170,10 +170,10 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   /**
    * Call the 'getLiveSession' RPC method.
    * This method retrieves the live session data from the WebSocket server.
-   * It expects the response to be a `StoreLiveSession` object or `null`.
+   * It expects the response to be a `true` object or `null`.
    *
    * @param params - Parameters to pass to the 'getLiveSession' method.
-   * @returns {Promise<StoreLiveSession | null>} - The live session data.
+   * @returns {Promise<boolean | null>} - The live session data.
    */
   async getLiveSession(params: ConnectionIdDto): Promise<boolean> {
     try {

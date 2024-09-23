@@ -10,6 +10,7 @@ import {
   TakeFromQueueDto,
   ConnectionIdDto,
   AddLiveSessionDto,
+  RemoveAllMessagesDto,
 } from './dto/messagerepository-websocket.dto'
 import { StoreQueuedMessage } from './schemas/StoreQueuedMessage'
 import { InjectRedis } from '@nestjs-modules/ioredis'
@@ -268,6 +269,51 @@ export class WebsocketService {
         error: error.message,
       })
       throw error
+    }
+  }
+
+  /**
+   * Removes all messages associated with the given connectionId and recipientDid.
+   * Messages are removed from both Redis and MongoDB.
+   *
+   * @param removeAllMessagesDto - Data Transfer Object containing connectionId and recipientDid
+   * @returns {Promise<void>} - This function does not return any value.
+   * @throws {Error} - If the operation fails to remove messages.
+   */
+  async removeAllMessage(dto: RemoveAllMessagesDto): Promise<void> {
+    const { connectionId, recipientDid } = dto
+
+    try {
+      // Get the list of messages stored in Redis associated with the connectionId
+      const key = `connectionId:${connectionId}:queuemessages`
+      const messages = await this.redis.lrange(key, 0, -1) // Retrieve all messages from Redis
+
+      // Filter messages that match the recipientDid
+      const messagesToRemove = messages.filter((message) => {
+        const parsedMessage = JSON.parse(message)
+        return parsedMessage.recipientDids.includes(recipientDid)
+      })
+
+      // Remove the filtered messages from Redis
+      for (const message of messagesToRemove) {
+        await this.redis.lrem(key, 1, message) // Remove each message from the list in Redis
+      }
+
+      // Remove the corresponding messages from MongoDB
+      await this.queuedMessage.deleteMany({
+        connectionId,
+        recipientKeys: recipientDid, // Assuming recipientDids is stored as an array in MongoDB
+      })
+
+      this.logger.log(
+        `Successfully removed all messages for connectionId ${connectionId} and recipientDid ${recipientDid}`,
+      )
+    } catch (error) {
+      this.logger.error(
+        `Failed to remove messages for connectionId ${connectionId} and recipientDid ${recipientDid}`,
+        error,
+      )
+      throw new Error('Failed to remove messages')
     }
   }
 

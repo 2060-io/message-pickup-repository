@@ -6,6 +6,7 @@ import {
   AddLiveSessionDto,
   AddMessageDto,
   ConnectionIdDto,
+  RemoveAllMessagesDto,
   RemoveMessagesDto,
   TakeFromQueueDto,
 } from './dto/messagerepository-websocket.dto'
@@ -111,6 +112,16 @@ export class WebsocketGateway implements OnModuleInit, OnModuleDestroy {
       this.server.register('removeMessages', async (params: RemoveMessagesDto) => {
         try {
           await this.websocketService.removeMessages(params)
+          return true
+        } catch (error) {
+          this.logger.error('Error in removeMessages method', error.stack)
+          throw this.server.createError(500, 'Internal server error', { details: error.message })
+        }
+      })
+
+      this.server.register('removeAllMessages', async (params: RemoveAllMessagesDto) => {
+        try {
+          await this.websocketService.removeAllMessage(params)
           return true
         } catch (error) {
           this.logger.error('Error in removeMessages method', error.stack)
