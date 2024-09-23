@@ -1,4 +1,4 @@
-import { IsNotEmpty } from 'class-validator'
+import { IsNotEmpty, IsString } from 'class-validator'
 
 export class ConnectionIdDto {
   @IsNotEmpty({ message: 'connectionId is required' })
@@ -11,4 +11,13 @@ export class AddLiveSessionDto {
 
   @IsNotEmpty({ message: 'sessionId is required' })
   sessionId: string
+}
+
+export class RemoveAllMessagesDto {
+  @IsNotEmpty()
+  connectionId: string
+
+  @IsNotEmpty()
+  @IsString()
+  recipientDid: string
 }

@@ -1,4 +1,4 @@
-import { MessagePickupRepositoryClient } from './MessagePickupRepositoryClient'
+import { MessagePickupRepositoryClient } from '../lib/MessagePickupRepositoryClient'
 import { Logger } from '@nestjs/common'
 
 const logger = new Logger('WebSocketTestScript')
@@ -9,7 +9,7 @@ const logger = new Logger('WebSocketTestScript')
   await client.connect()
 
   client.messageReceived((data) => {
-    console.log('Received message:', data)
+    logger.debug(`*** [messageReceive] listener: ${JSON.stringify(data, null, 2)}  ****:`)
   })
 
   const connectionId_1 = '8df6b644-0206-4d50-aade-a565d5c82683'
@@ -130,20 +130,27 @@ const logger = new Logger('WebSocketTestScript')
 
     await new Promise((resolve) => setTimeout(resolve, 2000))
 
-    const [removeMessages1] = await Promise.all([
-      await client.removeMessages({ connectionId: connectionId_2, messageIds: messageIds1 }),
+    const [removeAllMessages] = await Promise.all([
+      await client.removeAllMessages({
+        connectionId: connectionId_2,
+        recipientDid: 'HBstN9Dusi7vJzuQ99fCmnvvrcKPAprCknp6XKmgHk89',
+      }),
     ])
 
     logger.log(`client-1 RemoveMessages: ${JSON.stringify(removeMessages, null, 2)}`)
-    logger.log(`client-2 RemoveMessages: ${JSON.stringify(removeMessages1, null, 2)}`)
+    logger.log(`client-2 RemoveAllMessages: ${JSON.stringify(removeAllMessages, null, 2)}`)
 
     logger.log(`\n *** End takeFromQueue test ***\n`)
     await new Promise((resolve) => setTimeout(resolve, 5000))
 
     // Eliminar sesiones en vivo
     logger.log(`*** Begin removeLiveSession test ***\n`)
-    const removeSession = await client.removeLiveSession({ connectionId: connectionId_1 })
-    const removeSession1 = await client.removeLiveSession({ connectionId: connectionId_2 })
+    const removeSession = await client.removeLiveSession({
+      connectionId: connectionId_1,
+    })
+    const removeSession1 = await client.removeLiveSession({
+      connectionId: connectionId_2,
+    })
     logger.log(`RemoveLiveSession client-1: ${removeSession} -- client-2: ${removeSession1}`)
     logger.log(`\n *** End removeLiveSession test ***\n`)
   } catch (error) {

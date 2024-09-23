@@ -282,6 +282,7 @@ export class WebsocketService {
    */
   async removeAllMessage(dto: RemoveAllMessagesDto): Promise<void> {
     const { connectionId, recipientDid } = dto
+    this.logger.debug('[removeAllMessage] Method called with DTO:', dto)
 
     try {
       // Get the list of messages stored in Redis associated with the connectionId

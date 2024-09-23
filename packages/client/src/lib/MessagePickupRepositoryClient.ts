@@ -1,6 +1,6 @@
 import { Client } from 'rpc-websockets'
 import { Logger } from '@nestjs/common'
-import { AddLiveSessionDto, ConnectionIdDto } from '../dto/client.dto'
+import { AddLiveSessionDto, ConnectionIdDto, RemoveAllMessagesDto } from '../dto/client.dto'
 import { JsonRpcParamsMessage } from '../interfaces/interfaces'
 import {
   AddMessageOptions,
@@ -163,6 +163,24 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
       }
     } catch (error) {
       this.logger.error('Error calling removeMessages:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Call the 'removeAllMessages' RPC method.
+   * @param params - Parameters to pass to the 'removeAllMessages' method.
+   * @returns {Promise<void>}
+   */
+  async removeAllMessages(params: RemoveAllMessagesDto): Promise<void> {
+    try {
+      const result: unknown = await this.client.call('removeAllMessages', params, 2000)
+
+      if (typeof result !== 'boolean') {
+        throw new Error('Unexpected result: Expected an object or null')
+      }
+    } catch (error) {
+      this.logger.error('Error calling removeAllMessages:', error)
       throw error
     }
   }

@@ -124,7 +124,7 @@ export class WebsocketGateway implements OnModuleInit, OnModuleDestroy {
           await this.websocketService.removeAllMessage(params)
           return true
         } catch (error) {
-          this.logger.error('Error in removeMessages method', error.stack)
+          this.logger.error('Error in removeAllMessages method', error.stack)
           throw this.server.createError(500, 'Internal server error', { details: error.message })
         }
       })
