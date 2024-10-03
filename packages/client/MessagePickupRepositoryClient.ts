@@ -1,7 +1,7 @@
 import { Client } from 'rpc-websockets'
 import { Logger } from '@nestjs/common'
-import { AddLiveSessionDto, ConnectionIdDto, RemoveAllMessagesDto } from '../dto/client.dto'
-import { JsonRpcParamsMessage } from '../interfaces/interfaces'
+import { AddLiveSessionDto, ConnectionIdDto, RemoveAllMessagesDto } from './client.dto'
+import { JsonRpcParamsMessage } from './interfaces'
 import {
   AddMessageOptions,
   GetAvailableMessageCountOptions,
