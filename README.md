@@ -50,6 +50,10 @@ $ yarn run test:e2e
 $ yarn run test:cov
 ```
 
+## Message Pickup Repository Documentation
+
+For more information on how the server works, including details on WebSocket methods, pub/sub, and push notifications, check out the [Message Pickup Repository Server](./docs/message-pickup-repository-server.md).
+
 ## Message Pickup Repository Client Documentation
 
 For detailed instructions on setting up a client, including typescript examples, check out the [Message Pickup Repository Client](./docs/message-pickup-repository-client.md).

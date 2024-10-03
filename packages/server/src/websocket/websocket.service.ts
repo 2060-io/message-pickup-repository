@@ -565,11 +565,15 @@ export class WebsocketService {
    * the given `socket_id`. If the client is found and its connection is open, the message is sent.
    *
    * @param {string} socket_id - The unique identifier of the WebSocket client to which the message will be sent.
-   * @param {string} message - The message that will be sent to the WebSocket client.
-   *
-   * @returns {void}
-   *
-   * @throws {Error} If an error occurs during message transmission.
+   * @param {JsonRpcResponseSubscriber} message - The message to send, including:
+   *   @property {string} jsonrpc - The JSON-RPC version, always '2.0'.
+   *   @property {string} method - The method being invoked, in this case, 'messageReceive'.
+   *   @property {Object} params - An object containing:
+   *     @property {string} connectionId - The ID of the connection associated with the message.
+   *     @property {QueuedMessage[]} message - An array of messages to be sent.
+   *     @property {string} id - messageId of the message being sent.
+   * @returns {Promise<void>} - Resolves when the message is successfully sent, or logs a warning if no matching client is found.
+   * @throws Will throw an error if an issue occurs during message transmission.
    */
   async sendMessageToClientById(socket_id: string, message: JsonRpcResponseSubscriber): Promise<void> {
     try {
