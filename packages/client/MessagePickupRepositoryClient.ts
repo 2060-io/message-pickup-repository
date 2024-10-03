@@ -1,7 +1,11 @@
 import { Client } from 'rpc-websockets'
 import { Logger } from '@nestjs/common'
-import { AddLiveSessionDto, ConnectionIdDto, RemoveAllMessagesDto } from './client.dto'
-import { JsonRpcParamsMessage } from './interfaces'
+import {
+  JsonRpcParamsMessage,
+  RemoveAllMessagesOptions,
+  ConnectionIdOptions,
+  AddLiveSessionOptions,
+} from './interfaces'
 import {
   AddMessageOptions,
   GetAvailableMessageCountOptions,
@@ -76,8 +80,13 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   /**
    * Call the 'takeFromQueue' RPC method.
    * This method sends a request to the WebSocket server to take messages from the queue.
-   * It expects the response to be an array of `QueuedMessage` objects.   *
-   * @param params - Parameters to pass to the 'takeFromQueue' method.
+   * It expects the response to be an array of `QueuedMessage` objects.
+   *
+   * @param {TakeFromQueueOptions} params - The parameters to pass to the 'takeFromQueue' method, including:
+   *   @property {string} connectionId - The ID of the connection from which to take messages.
+   *   @property {string} [recipientDid] - Optional DID of the recipient to filter messages by.
+   *   @property {number} [limit] - Optional maximum number of messages to take from the queue.
+   *   @property {boolean} [deleteMessages] - Optional flag indicating whether to delete the messages after retrieving them.
    * @returns {Promise<QueuedMessage[]>} - The result from the WebSocket server, expected to be an array of `QueuedMessage`.
    * @throws Will throw an error if the result is not an array or if there's any issue with the WebSocket call.
    */
@@ -101,8 +110,13 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
 
   /**
    * Call the 'getAvailableMessageCount' RPC method.
-   * @param params - Parameters to pass to the 'getAvailableMessageCount' method.
+   * This method sends a request to the WebSocket server to retrieve the number of queued messages.
+   *
+   * @param {GetAvailableMessageCountOptions} params - The parameters to pass to the 'getAvailableMessageCount' method, including:
+   *   @property {string} connectionId - The ID of the connection for which to count the queued messages.
+   *   @property {string} [recipientDid] - Optional DID of the recipient to filter the message count.
    * @returns {Promise<number>} - The count of queued messages.
+   * @throws Will throw an error if the result is not a number or if there's any issue with the WebSocket call.
    */
   async getAvailableMessageCount(params: GetAvailableMessageCountOptions): Promise<number> {
     try {
@@ -122,10 +136,14 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   /**
    * Call the 'addMessage' RPC method.
    * This method sends a request to the WebSocket server to add a message to the queue.
-   * It expects the response to be a string.   *
-   * @param params - Parameters to pass to the 'addMessage' method.
-   * @returns {Promise<string>} - The result from the WebSocket server, expected to be a string.
-   * @throws Will throw an error if the result is not a string or if there's any issue with the WebSocket call.
+   * It expects the response to be a string or null.
+   *
+   * @param {AddMessageOptions} params - The parameters to pass to the 'addMessage' method, including:
+   *   @property {string} connectionId - The ID of the connection to which the message will be added.
+   *   @property {string[]} recipientDids - An array of DIDs of the recipients for whom the message is intended.
+   *   @property {EncryptedMessage} payload - The encrypted message content to be queued.
+   * @returns {Promise<string|null>} - The result from the WebSocket server, expected to be a string or null.
+   * @throws Will throw an error if the result is not an object, null, or if there's any issue with the WebSocket call.
    */
   async addMessage(params: AddMessageOptions): Promise<string> {
     try {
@@ -151,8 +169,13 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
 
   /**
    * Call the 'removeMessages' RPC method.
-   * @param params - Parameters to pass to the 'removeMessages' method.
-   * @returns {Promise<void>}
+   * This method sends a request to the WebSocket server to remove messages from the queue.
+   *
+   * @param {RemoveMessagesOptions} params - The parameters to pass to the 'removeMessages' method, including:
+   *   @property {string} connectionId - The ID of the connection from which the messages will be removed.
+   *   @property {string[]} messageIds - An array of message IDs to be removed.
+   * @returns {Promise<void>} - Resolves to `void` upon successful removal.
+   * @throws Will throw an error if the result is not a boolean or if there's any issue with the WebSocket call.
    */
   async removeMessages(params: RemoveMessagesOptions): Promise<void> {
     try {
@@ -172,7 +195,7 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
    * @param params - Parameters to pass to the 'removeAllMessages' method.
    * @returns {Promise<void>}
    */
-  async removeAllMessages(params: RemoveAllMessagesDto): Promise<void> {
+  async removeAllMessages(params: RemoveAllMessagesOptions): Promise<void> {
     try {
       const result: unknown = await this.client.call('removeAllMessages', params, 2000)
 
@@ -188,12 +211,14 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   /**
    * Call the 'getLiveSession' RPC method.
    * This method retrieves the live session data from the WebSocket server.
-   * It expects the response to be a `true` object or `null`.
+   * It expects the response to be a boolean or null.
    *
-   * @param params - Parameters to pass to the 'getLiveSession' method.
-   * @returns {Promise<boolean | null>} - The live session data.
+   * @param {ConnectionIdOptions} params - The parameters to pass to the 'getLiveSession' method, including:
+   *   @property {string} connectionId - The ID of the connection for which the live session is being retrieved.
+   * @returns {Promise<boolean | null>} - The live session data. Returns `true` if the live session is active, or `null` if no session exists.
+   * @throws Will throw an error if the result is not a boolean or null, or if there's any issue with the WebSocket call.
    */
-  async getLiveSession(params: ConnectionIdDto): Promise<boolean> {
+  async getLiveSession(params: ConnectionIdOptions): Promise<boolean> {
     try {
       const result: unknown = await this.client.call('getLiveSession', params, 2000)
 
@@ -216,11 +241,13 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
    * This method sends a request to the WebSocket server to add a live session.
    * It expects the response to be a boolean indicating success or failure.
    *
-   * @param params - Parameters to pass to the 'addLiveSession' method.
-   * @returns {Promise<boolean>} - The result from the WebSocket server, expected to be a boolean.
+   * @param {AddLiveSessionOptions} params - The parameters to pass to the 'addLiveSession' method, including:
+   *   @property {string} connectionId - The ID of the connection for which the live session is being added.
+   *   @property {string} sessionId - The ID of the live session to be added.
+   * @returns {Promise<boolean>} - The result from the WebSocket server, expected to be a boolean indicating success (`true`) or failure (`false`).
    * @throws Will throw an error if the result is not a boolean or if there's any issue with the WebSocket call.
    */
-  async addLiveSession(params: AddLiveSessionDto): Promise<boolean> {
+  async addLiveSession(params: AddLiveSessionOptions): Promise<boolean> {
     try {
       const result: unknown = await this.client.call('addLiveSession', params, 2000)
 
@@ -239,10 +266,14 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
 
   /**
    * Call the 'removeLiveSession' RPC method.
-   * @param params - Parameters to pass to the 'removeLiveSession' method.
-   * @returns {Promise<boolean>} - The result from the WebSocket server.
+   * This method sends a request to the WebSocket server to remove a live session.
+   *
+   * @param {ConnectionIdOptions} params - The parameters to pass to the 'removeLiveSession' method, including:
+   *   @property {string} connectionId - The ID of the connection for which the live session will be removed.
+   * @returns {Promise<boolean>} - The result from the WebSocket server, expected to be a boolean indicating success (`true`) or failure (`false`).
+   * @throws Will throw an error if the result is not a boolean or if there's any issue with the WebSocket call.
    */
-  async removeLiveSession(params: ConnectionIdDto): Promise<boolean> {
+  async removeLiveSession(params: ConnectionIdOptions): Promise<boolean> {
     try {
       const result: unknown = await this.client.call('removeLiveSession', params, 2000)
 
@@ -259,8 +290,11 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   }
 
   /**
-   * Call the 'ping' RPC method to check the connection.
-   * @returns {Promise<string>} - 'pong' response from the server.
+   * Call the 'ping' RPC method to check the WebSocket connection.
+   * This method sends a ping request to the WebSocket server and expects a 'pong' response.
+   *
+   * @returns {Promise<string>} - The 'pong' response from the WebSocket server.
+   * @throws Will throw an error if there's any issue with the WebSocket call.
    */
   async ping(): Promise<string | unknown> {
     try {

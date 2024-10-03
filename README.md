@@ -2,7 +2,7 @@
 
 ## Description
 
-Service designed for the management and storage of messaging for the Message Pickup repository of the credo-ts framework. It allows and facilitates the methods implemented by this module for handling messages from the mediator and its clients, adding live session management for clients, as well as a new message notification process for clients connected on other instances when there is more than one mediation instance. This method works through webhook technology to an endpoint integrated with the mediator that receives and dispatches messages to the corresponding live client.
+Service designed for the management and storage of messaging for the Message Pickup repository of the credo-ts framework. It allows and facilitates the methods implemented by this module for handling messages from the mediator and its clients, adding live session management for clients, as well as a publish and subscribe notification process for clients connected on other instances when there is more than one mediation instance.
 
 ## Enviroments
 
@@ -49,3 +49,7 @@ $ yarn run test:e2e
 # test coverage
 $ yarn run test:cov
 ```
+
+## Message Pickup Repository Client Documentation
+
+For detailed instructions on setting up a client, including typescript examples, check out the [Message Pickup Repository Client](./docs/message-pickup-repository-client.md).
