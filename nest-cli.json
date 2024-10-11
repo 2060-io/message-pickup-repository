@@ -5,7 +5,7 @@
   "compilerOptions": {
     "deleteOutDir": true,
     "webpack": true,
-    "tsConfigPath": "packages/server/tsconfig.app.json"
+    "tsConfigPath": "packages/server/tsconfig.json"
   },
   "monorepo": true,
   "root": "packages/server",
@@ -16,7 +16,7 @@
       "entryFile": "main",
       "sourceRoot": "packages/server/src",
       "compilerOptions": {
-        "tsConfigPath": "packages/server/tsconfig.app.json"
+        "tsConfigPath": "packages/server/tsconfig.json"
       }
     },
     "client": {
@@ -25,7 +25,7 @@
       "entryFile": "main",
       "sourceRoot": "packages/client/src",
       "compilerOptions": {
-        "tsConfigPath": "packages/client/tsconfig.app.json"
+        "tsConfigPath": "packages/client/tsconfig.json"
       }
     }
   }
