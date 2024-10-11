@@ -1,5 +1,5 @@
 import { Client } from 'rpc-websockets'
-import { Logger } from '@nestjs/common'
+import log from 'loglevel'
 import {
   JsonRpcParamsMessage,
   RemoveAllMessagesOptions,
@@ -15,9 +15,11 @@ import {
   TakeFromQueueOptions,
 } from '@credo-ts/core'
 
+log.setLevel('info')
+
 export class MessagePickupRepositoryClient implements MessagePickupRepository {
-  private client: Client
-  private readonly logger = new Logger(MessagePickupRepositoryClient.name)
+  private client?: Client
+  private readonly logger = log
   private messageReceivedCallback: ((data: JsonRpcParamsMessage) => void) | null = null
 
   constructor(private readonly url: string) {}
@@ -30,12 +32,14 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
     return new Promise((resolve, reject) => {
       this.client = new Client(this.url)
 
-      this.client.on('open', () => {
-        this.logger.log(`Connected to WebSocket server ${this.client}`)
+      const client = this.checkClient()
 
-        this.client.subscribe('messageReceive')
+      client.on('open', () => {
+        this.logger.log(`Connected to WebSocket server ${client}`)
 
-        this.client.addListener('messageReceive', (data) => {
+        client.subscribe('messageReceive')
+
+        client.addListener('messageReceive', (data) => {
           if (this.messageReceivedCallback) {
             this.messageReceivedCallback(data)
           } else {
@@ -46,11 +50,18 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
         resolve()
       })
 
-      this.client.on('error', (error) => {
+      client.on('error', (error) => {
         this.logger.error('WebSocket connection error:', error)
         reject(error)
       })
     })
+  }
+
+  private checkClient(): Client {
+    if (!this.client) {
+      throw new Error('Client is not initialized. Call connect() first.')
+    }
+    return this.client
   }
 
   /**
@@ -92,8 +103,9 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
    */
   async takeFromQueue(params: TakeFromQueueOptions): Promise<QueuedMessage[]> {
     try {
+      const client = this.checkClient()
       // Call the RPC method and store the result as 'unknown' type initially
-      const result: unknown = await this.client.call('takeFromQueue', params, 2000)
+      const result: unknown = await client.call('takeFromQueue', params, 2000)
 
       // Check if the result is an array and cast it to QueuedMessage[]
       if (Array.isArray(result)) {
@@ -120,7 +132,8 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
    */
   async getAvailableMessageCount(params: GetAvailableMessageCountOptions): Promise<number> {
     try {
-      const result: unknown = await this.client.call('getAvailableMessageCount', params, 2000)
+      const client = this.checkClient()
+      const result: unknown = await client.call('getAvailableMessageCount', params, 2000)
 
       if (typeof result === 'number') {
         return result
@@ -147,8 +160,9 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
    */
   async addMessage(params: AddMessageOptions): Promise<string> {
     try {
+      const client = this.checkClient()
       // Call the RPC method and store the result as 'unknown' type initially
-      const result: unknown = await this.client.call('addMessage', params, 2000)
+      const result: unknown = await client.call('addMessage', params, 2000)
 
       this.logger.debug(`**** result: ${JSON.stringify(result, null, 2)} ***`)
 
@@ -156,7 +170,7 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
       if (result && typeof result === 'object') {
         return JSON.stringify(result)
       } else if (result === null) {
-        return null
+        return ''
       } else {
         throw new Error('Unexpected result: Expected an object or null')
       }
@@ -179,7 +193,8 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
    */
   async removeMessages(params: RemoveMessagesOptions): Promise<void> {
     try {
-      const result: unknown = await this.client.call('removeMessages', params, 2000)
+      const client = this.checkClient()
+      const result: unknown = await client.call('removeMessages', params, 2000)
 
       if (typeof result !== 'boolean') {
         throw new Error('Unexpected result: Expected an object or null')
@@ -197,7 +212,8 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
    */
   async removeAllMessages(params: RemoveAllMessagesOptions): Promise<void> {
     try {
-      const result: unknown = await this.client.call('removeAllMessages', params, 2000)
+      const client = this.checkClient()
+      const result: unknown = await client.call('removeAllMessages', params, 2000)
 
       if (typeof result !== 'boolean') {
         throw new Error('Unexpected result: Expected an object or null')
@@ -220,13 +236,14 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
    */
   async getLiveSession(params: ConnectionIdOptions): Promise<boolean> {
     try {
-      const result: unknown = await this.client.call('getLiveSession', params, 2000)
+      const client = this.checkClient()
+      const result: unknown = await client.call('getLiveSession', params, 2000)
 
       // Check if the result is an object or null
       if (typeof result === 'boolean') {
         return result as boolean
       } else if (result === null) {
-        return null
+        return false
       } else {
         throw new Error('Unexpected result: Expected an object or null')
       }
@@ -249,7 +266,8 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
    */
   async addLiveSession(params: AddLiveSessionOptions): Promise<boolean> {
     try {
-      const result: unknown = await this.client.call('addLiveSession', params, 2000)
+      const client = this.checkClient()
+      const result: unknown = await client.call('addLiveSession', params, 2000)
 
       // Check if the result is a boolean and return it
       if (typeof result === 'boolean') {
@@ -275,7 +293,8 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
    */
   async removeLiveSession(params: ConnectionIdOptions): Promise<boolean> {
     try {
-      const result: unknown = await this.client.call('removeLiveSession', params, 2000)
+      const client = this.checkClient()
+      const result: unknown = await client.call('removeLiveSession', params, 2000)
 
       // Check if the result is a boolean and return it
       if (typeof result === 'boolean') {
@@ -298,7 +317,8 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
    */
   async ping(): Promise<string | unknown> {
     try {
-      return await this.client.call('ping')
+      const client = this.checkClient()
+      return await client.call('ping')
     } catch (error) {
       this.logger.error('Error calling ping:', error)
       throw error
@@ -310,7 +330,8 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
    * @returns {Promise<void>}
    */
   async disconnect(): Promise<void> {
-    this.client.close()
+    const client = this.checkClient()
+    client.close()
     this.logger.log('WebSocket client disconnected')
   }
 }
