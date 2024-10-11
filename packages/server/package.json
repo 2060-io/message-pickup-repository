@@ -8,7 +8,7 @@
   "scripts": {
     "build": "nest build",
     "check-types": "eslint \"{src,packages,libs,test}/**/*.ts\"",
-    "format": "prettier --write \"src/**/*.ts\"",
+    "format": "prettier --write \"packages/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
