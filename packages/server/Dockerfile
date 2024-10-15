@@ -1,7 +1,6 @@
-FROM node:22-alpine3.20 as base
+FROM node:22-alpine3.20 AS base
 
-
-# MSM Setup
+# MPR Setup
 WORKDIR /app
 
 # Copy package.json and yarn.lock first to leverage Docker layer caching
