@@ -2,11 +2,11 @@
   "name": "@2060.io/message-pickup-repository-client",
   "version": "1.0.0",
   "description": "message pickup repository client",
-  "main": "dist/index.js",
+  "main": "build/index.js",
   "license": "Apache-2.0",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "node build/index.js",
     "start:dev": "nest start --watch",
     "test": "jest"
   },
