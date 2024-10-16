@@ -16,10 +16,7 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
-    "noFallthroughCasesInSwitch": false,
-    "paths": {
-      "@message-pickup-repository/client": ["packages/client/MessagePickupRepositoryClient.ts"]
-    }
+    "noFallthroughCasesInSwitch": false
   },
   "include": ["src/**/*.ts", "packages/**/*.ts"]
 }
