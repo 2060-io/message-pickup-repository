@@ -110,21 +110,23 @@ describe('WebsocketService', () => {
     expect(result[1].encryptedMessage).toBe('test-message-2') // Verifica por 'id'
   })
 
-  it('should getAvailableMessageCount of available messages from Redis', async () => {
-    // Mock Redis to return a predefined count of messages
-    jest.spyOn(redisMock, 'llen').mockResolvedValue(5)
+  it('should getAvailableMessageCount of available messages from Redis and MongoDB', async () => {
+    const connectionId = 'test-connection-id'
 
-    // Execute the getAvailableMessageCount method
+    // Mock Redis response
+    jest.spyOn(redisMock, 'llen').mockResolvedValue(5) // simula 5 mensajes en Redis
+
+    // Mock MongoDB countDocuments response
+    storeQueuedMessageMock.countDocuments = jest.fn().mockResolvedValue(3) // simula 3 mensajes en MongoDB
+
     const result = await service.getAvailableMessageCount({
       connectionId: 'test-connection-id',
       id: '1',
     })
 
-    // Verify that Redis was called with the correct key
-    expect(redisMock.llen).toHaveBeenCalledWith('connectionId:test-connection-id:queuemessages')
-
-    // Verify the returned count of available messages
-    expect(result).toBe(5)
+    expect(result).toBe(8) // 5 mensajes de Redis + 3 mensajes de MongoDB
+    expect(redisMock.llen).toHaveBeenCalledWith(`connectionId:${connectionId}:queuemessages`)
+    expect(storeQueuedMessageMock.countDocuments).toHaveBeenCalledWith({ connectionId })
   })
 
   it('should addmessage method to the queue and publish it to Redis', async () => {
@@ -214,7 +216,7 @@ describe('WebsocketService', () => {
     // Verify that messages were removed from MongoDB
     expect(storeQueuedMessageMock.deleteMany).toHaveBeenCalledWith({
       connectionId: removeMessagesDto.connectionId,
-      _id: { $in: removeMessagesDto.messageIds.map((id) => new Object(id)) },
+      messageId: { $in: removeMessagesDto.messageIds.map((id) => new Object(id)) },
     })
   })
 })
