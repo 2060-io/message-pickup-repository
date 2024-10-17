@@ -81,27 +81,27 @@ export class WebsocketGateway implements OnModuleInit, OnModuleDestroy {
    */
   private registerRpcMethods(): void {
     try {
-      this.server.register('takeFromQueue', async (params: TakeFromQueueDto) => {
+      this.server.register('takeFromQueue', async (params) => {
         try {
-          return await this.websocketService.takeFromQueue(params)
+          return await this.websocketService.takeFromQueue(params as TakeFromQueueDto)
         } catch (error) {
           this.logger.error('Error in takeFromQueue method', error.stack)
           throw this.server.createError(500, 'Internal server error', { details: error.message })
         }
       })
 
-      this.server.register('getAvailableMessageCount', async (params: ConnectionIdDto) => {
+      this.server.register('getAvailableMessageCount', async (params) => {
         try {
-          return await this.websocketService.getAvailableMessageCount(params)
+          return await this.websocketService.getAvailableMessageCount(params as ConnectionIdDto)
         } catch (error) {
           this.logger.error('Error in getAvailableMessageCount method', error.stack)
           throw this.server.createError(500, 'Internal server error', { details: error.message })
         }
       })
 
-      this.server.register('addMessage', async (params: AddMessageDto) => {
+      this.server.register('addMessage', async (params) => {
         try {
-          const result = await this.websocketService.addMessage(params)
+          const result = await this.websocketService.addMessage(params as AddMessageDto)
           return result
         } catch (error) {
           this.logger.log('Error in addMessage method', error.stack)
@@ -109,9 +109,9 @@ export class WebsocketGateway implements OnModuleInit, OnModuleDestroy {
         }
       })
 
-      this.server.register('removeMessages', async (params: RemoveMessagesDto) => {
+      this.server.register('removeMessages', async (params) => {
         try {
-          await this.websocketService.removeMessages(params)
+          await this.websocketService.removeMessages(params as RemoveMessagesDto)
           return true
         } catch (error) {
           this.logger.error('Error in removeMessages method', error.stack)
@@ -119,9 +119,9 @@ export class WebsocketGateway implements OnModuleInit, OnModuleDestroy {
         }
       })
 
-      this.server.register('removeAllMessages', async (params: RemoveAllMessagesDto) => {
+      this.server.register('removeAllMessages', async (params) => {
         try {
-          await this.websocketService.removeAllMessage(params)
+          await this.websocketService.removeAllMessage(params as RemoveAllMessagesDto)
           return true
         } catch (error) {
           this.logger.error('Error in removeAllMessages method', error.stack)
@@ -129,27 +129,27 @@ export class WebsocketGateway implements OnModuleInit, OnModuleDestroy {
         }
       })
 
-      this.server.register('getLiveSession', async (params: ConnectionIdDto) => {
+      this.server.register('getLiveSession', async (params) => {
         try {
-          return await this.websocketService.getLiveSession(params)
+          return await this.websocketService.getLiveSession(params as ConnectionIdDto)
         } catch (error) {
           this.logger.error('Error in getLiveSession method', error.stack)
           throw this.server.createError(500, 'Internal server error', { details: error.message })
         }
       })
 
-      this.server.register('addLiveSession', async (params: AddLiveSessionDto, socket_id: string) => {
+      this.server.register('addLiveSession', async (params, socket_id: string) => {
         try {
-          return await this.websocketService.addLiveSession(params, socket_id)
+          return await this.websocketService.addLiveSession(params as AddLiveSessionDto, socket_id)
         } catch (error) {
           this.logger.error('Error in addLiveSession method', error.stack)
           throw this.server.createError(500, 'Internal server error', { details: error.message })
         }
       })
 
-      this.server.register('removeLiveSession', async (params: ConnectionIdDto) => {
+      this.server.register('removeLiveSession', async (params) => {
         try {
-          return await this.websocketService.removeLiveSession(params)
+          return await this.websocketService.removeLiveSession(params as ConnectionIdDto)
         } catch (error) {
           this.logger.error('Error in removeLiveSession method', error.stack)
           throw this.server.createError(500, 'Internal server error', { details: error.message })

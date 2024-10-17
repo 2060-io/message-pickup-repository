@@ -1,6 +1,7 @@
 # compiled output
-/dist
-/node_modules
+build
+dist
+node_modules
 
 # Logs
 logs
@@ -39,3 +40,4 @@ lerna-debug.log*
 
 #files
 package-lock.json
+packages/server/yarn.lock
