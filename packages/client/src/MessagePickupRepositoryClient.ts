@@ -75,13 +75,14 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
    * @param {JsonRpcParamsMessage} data - The data received via the 'messageReceive' event.
    *
    * @param {string} data.connectionId - The ID of the connection associated with the message.
-   * @param {QueuedMessage[]} data.message - An array of queued messages received.
+   * @param {string} data.message - queued messages received.
    * @param {string} [data.id] - (Optional) The identifier for the JSON-RPC message.
    *
    * @example
    * messageReceived((data: JsonRpcParamsMessage) => {
    *   console.log('ConnectionId:', data.connectionId);
-   *   console.log('Messages:', data.message);
+   *   const message = JSON.parse(data.message)
+   *   console.log('Messages:', message.id);
    * });
    */
   messageReceived(callback: (data: JsonRpcParamsMessage) => void): void {
