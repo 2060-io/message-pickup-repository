@@ -1,13 +1,17 @@
 {
   "name": "message-pickup-repository",
   "version": "0.0.1",
-  "description": "",
-  "author": "",
+  "description": "DIDComm Message Pickup Repository",
+  "author": "2060.io",
   "private": true,
   "license": "Apache-2.0",
   "workspaces": [
     "packages/*"
   ],
+  "repository": {
+    "url": "https://github.com/2060-io/message-pickup-repository",
+    "type": "git"
+  },
   "scripts": {
     "check-types": "yarn check-types:build",
     "check-types:build": "yarn workspaces run tsc --noEmit -p tsconfig.build.json",

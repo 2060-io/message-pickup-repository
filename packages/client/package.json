@@ -8,6 +8,12 @@
   "files": [
     "build"
   ],
+  "homepage": "https://github.com/2060-io/message-pickup-repository/tree/main/packages/client",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/2060-io/message-pickup-repository",
+    "directory": "packages/client"
+  },
   "scripts": {
     "build": "yarn run clean && yarn run compile",
     "clean": "rimraf -rf ./build",
