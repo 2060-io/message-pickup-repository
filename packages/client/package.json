@@ -1,13 +1,16 @@
 {
   "name": "@2060.io/message-pickup-repository-client",
-  "version": "0.0.4",
-  "description": "Message Pickup Repository client module",
   "main": "build/index",
   "types": "build/index",
-  "license": "Apache-2.0",
+  "version": "0.0.4",
   "files": [
     "build"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "Message Pickup Repository client module",
+  "license": "Apache-2.0",
   "homepage": "https://github.com/2060-io/message-pickup-repository/tree/main/packages/client",
   "repository": {
     "type": "git",
@@ -37,8 +40,5 @@
   },
   "peerDependencies": {
     "@credo-ts/core": "^0.5.10"
-  },
-  "publishConfig": {
-    "access": "public"
   }
 }
