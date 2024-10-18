@@ -54,7 +54,6 @@ jobs:
           path: ./packages
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-          target-branch: chore/monorepo-build-setup
           token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Print release outputs for debugging
