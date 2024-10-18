@@ -1,6 +1,6 @@
 {
   "name": "@2060.io/message-pickup-repository-client",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Message Pickup Repository client module",
   "main": "build/index",
   "types": "build/index",
