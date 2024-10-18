@@ -191,11 +191,13 @@ export class WebsocketService {
       await this.redis.rpush(`connectionId:${connectionId}:queuemessages`, JSON.stringify(messageData))
 
       // test send message to publish channel connection id
-      const messagePublish = {
-        id: messageId,
-        receivedAt,
-        encryptedMessage: payload,
-      }
+      const messagePublish: QueuedMessage[] = [
+        {
+          id: messageId,
+          receivedAt,
+          encryptedMessage: payload,
+        },
+      ]
 
       this.logger.debug(`[addMessage] Message stored in Redis for connectionId ${connectionId}`)
 
@@ -396,7 +398,7 @@ export class WebsocketService {
         })
 
         // Handles messages received on the subscribed Redis channel
-        this.redisSubscriber.on('message', (channel: string, message: QueuedMessage[]) => {
+        this.redisSubscriber.on('message', (channel: string, message: string) => {
           if (channel === connectionId) {
             this.logger.log(`*** [redisSubscriber] Received message from ${channel}: ${message} **`)
 
@@ -405,7 +407,7 @@ export class WebsocketService {
               method: 'messageReceive',
               params: {
                 connectionId,
-                message,
+                message: JSON.parse(message),
                 id: dto.id,
               },
             }

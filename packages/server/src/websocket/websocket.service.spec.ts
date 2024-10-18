@@ -114,17 +114,17 @@ describe('WebsocketService', () => {
     const connectionId = 'test-connection-id'
 
     // Mock Redis response
-    jest.spyOn(redisMock, 'llen').mockResolvedValue(5) // simula 5 mensajes en Redis
+    jest.spyOn(redisMock, 'llen').mockResolvedValue(5) // Simulate 5 messages in Redis.
 
     // Mock MongoDB countDocuments response
-    storeQueuedMessageMock.countDocuments = jest.fn().mockResolvedValue(3) // simula 3 mensajes en MongoDB
+    storeQueuedMessageMock.countDocuments = jest.fn().mockResolvedValue(3) //Simulate 3 messages in MongoDB.
 
     const result = await service.getAvailableMessageCount({
       connectionId: 'test-connection-id',
       id: '1',
     })
 
-    expect(result).toBe(8) // 5 mensajes de Redis + 3 mensajes de MongoDB
+    expect(result).toBe(8) // 5 messages from Redis + 3 messages from MongoDB
     expect(redisMock.llen).toHaveBeenCalledWith(`connectionId:${connectionId}:queuemessages`)
     expect(storeQueuedMessageMock.countDocuments).toHaveBeenCalledWith({ connectionId })
   })

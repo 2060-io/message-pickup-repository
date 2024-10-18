@@ -1,8 +1,4 @@
-export interface JsonRpcParamsMessage {
-  connectionId: string
-  message: string
-  id?: string
-}
+import { QueuedMessage } from '@credo-ts/core'
 
 export interface RemoveAllMessagesOptions {
   connectionId: string
@@ -16,4 +12,9 @@ export interface ConnectionIdOptions {
 export interface AddLiveSessionOptions {
   connectionId: string
   sessionId: string
+}
+
+export interface MessageReceivedCallbackParams {
+  connectionId: string
+  message: QueuedMessage[]
 }
