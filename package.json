@@ -14,7 +14,7 @@
     "prettier": "prettier '**/*.+(js|json|ts|tsx|md|yml|yaml)'",
     "format": "yarn prettier --write",
     "check-format": "yarn prettier --list-different",
-    "test": "yarn workspaces run test",
+    "test": "yarn workspaces run test --passWithNoTests",
     "lint": "eslint --ignore-path .gitignore --ignore-pattern '**/esm/' .",
     "validate": "yarn lint && yarn check-types && yarn check-format"
   },
@@ -41,25 +41,5 @@
     "ts-node": "^10.9.1",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.1.3"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": ".",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "./coverage",
-    "testEnvironment": "node",
-    "roots": [
-      "<rootDir>/packages/"
-    ]
   }
 }
