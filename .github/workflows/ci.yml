@@ -81,7 +81,7 @@ jobs:
         run: yarn install --frozen-lockfile --ignore-scripts
 
       - name: Release to NPM
-        run: npm publish package/client
+        run: npm publish packages/client
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
   
