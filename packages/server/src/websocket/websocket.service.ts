@@ -405,7 +405,6 @@ export class WebsocketService {
             if (err) this.logger.error(err.message)
             this.logger.log(`Unsubscribed ${count} from ${connectionId} channel.`)
           })
-          await new Promise((resolve) => setTimeout(resolve, 200)) // Optional delay
         }
 
         this.logger.debug('[addLiveSession] try subscribe')
@@ -419,7 +418,7 @@ export class WebsocketService {
         this.logger.log(`Listener event count: ${this.redisSubscriber.listenerCount('message')}`)
 
         // Handle messages received on the subscribed Redis channel
-        if (this.redisSubscriber.listenerCount('message') <= 1) {
+        if (this.redisSubscriber.listenerCount('message') === 0) {
           this.redisSubscriber.on('message', (channel: string, message: string) => {
             if (channel === connectionId) {
               this.logger.log(`*** [redisSubscriber] Received message from ${channel}: ${message} **`)
