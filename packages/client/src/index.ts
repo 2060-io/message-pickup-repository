@@ -1,0 +1,1 @@
+export { MessagePickupRepositoryClient } from './MessagePickupRepositoryClient'
