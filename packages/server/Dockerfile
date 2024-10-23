@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package.json package.json
 
 # FIXME: yarn.lock per workspace 
-COPY yarn.lock yarn.lock
+# COPY yarn.lock yarn.lock
 
 # Run yarn install after copying only dependency files
 RUN yarn install

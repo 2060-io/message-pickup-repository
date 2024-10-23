@@ -379,8 +379,9 @@ export class WebsocketService {
     })
 
     this.logger.debug('[addLiveSession] socket_id:', { socket_id })
+
     try {
-      // Attempts to create a new live session record in the redis
+      // Use another Redis connection (not the subscriber) for general commands
       const sessionKey = `liveSession:${connectionId}`
       const response = await this.redis.hmset(sessionKey, {
         sessionId,
@@ -391,37 +392,59 @@ export class WebsocketService {
       if (response === 'OK') {
         this.logger.log('[addLiveSession] LiveSession added successfully', { connectionId })
 
-        // Subscribes to the Redis channel for the connection ID
+        // Use the general Redis connection (not the subscriber) to check subscribed channels
+        const subscribedChannels = await this.redis.pubsub('CHANNELS')
+        const isSubscribed = subscribedChannels.includes(connectionId)
+
+        this.logger.debug(`[addLiveSession] subscribedChannels: ${subscribedChannels} - isSubscribed: ${isSubscribed}`)
+
+        if (isSubscribed) {
+          // If already subscribed, unsubscribe first using the subscriber Redis connection
+          this.logger.log(`[addLiveSession] Already subscribed to ${connectionId}, unsubscribing first...`)
+          await this.redisSubscriber.unsubscribe(connectionId, (err, count) => {
+            if (err) this.logger.error(err.message)
+            this.logger.log(`Unsubscribed ${count} from ${connectionId} channel.`)
+          })
+          await new Promise((resolve) => setTimeout(resolve, 200)) // Optional delay
+        }
+
+        this.logger.debug('[addLiveSession] try subscribe')
+
+        // Use redisSubscriber for subscriptions only
         await this.redisSubscriber.subscribe(connectionId, (err, count) => {
           if (err) this.logger.error(err.message)
           this.logger.log(`Subscribed ${count} to ${connectionId} channel.`)
         })
 
-        // Handles messages received on the subscribed Redis channel
-        this.redisSubscriber.on('message', (channel: string, message: string) => {
-          if (channel === connectionId) {
-            this.logger.log(`*** [redisSubscriber] Received message from ${channel}: ${message} **`)
+        this.logger.log(`Listener event count: ${this.redisSubscriber.listenerCount('message')}`)
 
-            const jsonRpcResponse: JsonRpcResponseSubscriber = {
-              jsonrpc: '2.0',
-              method: 'messageReceive',
-              params: {
-                connectionId,
-                message: JSON.parse(message),
-                id: dto.id,
-              },
+        // Handle messages received on the subscribed Redis channel
+        if (this.redisSubscriber.listenerCount('message') <= 1) {
+          this.redisSubscriber.on('message', (channel: string, message: string) => {
+            if (channel === connectionId) {
+              this.logger.log(`*** [redisSubscriber] Received message from ${channel}: ${message} **`)
+
+              const jsonRpcResponse: JsonRpcResponseSubscriber = {
+                jsonrpc: '2.0',
+                method: 'messageReceive',
+                params: {
+                  connectionId,
+                  message: JSON.parse(message),
+                  id: dto.id,
+                },
+              }
+
+              this.sendMessageToClientById(socket_id, jsonRpcResponse)
             }
-
-            this.sendMessageToClientById(socket_id, jsonRpcResponse)
-          }
-        })
+          })
+        }
         return true
       } else {
         this.logger.error('[addLiveSession] Failed to add LiveSession', { connectionId })
         return false
       }
     } catch (error) {
-      // Logs any errors encountered during the process and returns false
+      // Log any errors encountered during the process and return false
       this.logger.error('[addLiveSession] Error adding LiveSession to DB', {
         connectionId,
         error: error.message,
@@ -589,21 +612,24 @@ export class WebsocketService {
 
       // Iterate over all connected WebSocket clients
       this.server.wss.clients.forEach(async (client) => {
-        this.logger.debug(`[sendMessageToClientById] Find WebSocket client: ${JSON.stringify((client as any)._id)}}`)
+        this.logger.debug(`[sendMessageToClientById] Find WebSocket client: ${socket_id}`)
         // Check if the client's ID matches the provided socket_id and if the connection is open
 
         if ((client as any)._id === socket_id && client.readyState === 1) {
           clientFound = true
-          this.logger.debug(`[sendMessageToClientById] Sending message to WebSocket client: ${socket_id}`)
+          this.logger.debug(
+            `[sendMessageToClientById] Sending message to WebSocket client: ${JSON.stringify((client as any)._id)}}`,
+          )
 
           // Send the message to the client
           const sendMessage = client.send(JSON.stringify(message), (error) => {
-            this.logger.debug(`*** Error send: ${error}`)
+            if (error) this.logger.debug(`*** Error send: ${error} ***`)
           })
 
           this.logger.log(
-            `[sendMessageToClientById] Message sent successfully ${sendMessage} to client with ID: ${socket_id}`,
+            `[sendMessageToClientById] Message sent successfully ${sendMessage} to client with ID: ${JSON.stringify((client as any)._id)}}`,
           )
+          return
         }
       })
 
