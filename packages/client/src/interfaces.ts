@@ -16,5 +16,5 @@ export interface AddLiveSessionOptions {
 
 export interface MessagesReceivedCallbackParams {
   connectionId: string
-  message: QueuedMessage[]
+  messages: QueuedMessage[]
 }
