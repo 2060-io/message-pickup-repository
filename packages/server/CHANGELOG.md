@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.5](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-server@v0.0.4...@2060.io/message-pickup-repository-server@v0.0.5) (2024-10-25)
+
+
+### Bug Fixes
+
+* ensure single Redis message listener and include new handle messages ([#19](https://github.com/2060-io/message-pickup-repository/issues/19)) ([22848d7](https://github.com/2060-io/message-pickup-repository/commit/22848d7df5a5b8c02055a12b6fda5d299b26ad28))
+
 ## [0.0.4](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-server@v0.0.3...@2060.io/message-pickup-repository-server@v0.0.4) (2024-10-23)
 
 
