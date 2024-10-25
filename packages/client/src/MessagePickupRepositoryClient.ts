@@ -4,7 +4,7 @@ import {
   RemoveAllMessagesOptions,
   ConnectionIdOptions,
   AddLiveSessionOptions,
-  MessageReceivedCallbackParams,
+  MessagesReceivedCallbackParams,
 } from './interfaces'
 import {
   AddMessageOptions,
@@ -20,7 +20,7 @@ log.setLevel('info')
 export class MessagePickupRepositoryClient implements MessagePickupRepository {
   private client?: Client
   private readonly logger = log
-  private messageReceivedCallback: ((data: MessageReceivedCallbackParams) => void) | null = null
+  private messagesReceivedCallback: ((data: MessagesReceivedCallbackParams) => void) | null = null
 
   constructor(private readonly url: string) {}
 
@@ -37,11 +37,11 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
       client.on('open', () => {
         this.logger.log(`Connected to WebSocket server ${client}`)
 
-        client.subscribe('messageReceive')
+        client.subscribe('messagesReceived')
 
-        client.addListener('messageReceive', (data) => {
-          if (this.messageReceivedCallback) {
-            this.messageReceivedCallback(data as MessageReceivedCallbackParams)
+        client.addListener('messagesReceived', (data) => {
+          if (this.messagesReceivedCallback) {
+            this.messagesReceivedCallback(data as MessagesReceivedCallbackParams)
           } else {
             this.logger.log('Received message event, but no callback is registered:', data)
           }
@@ -65,28 +65,28 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   }
 
   /**
-   * Register a callback function for the 'messageReceive' event.
-   * This function allows you to set up a listener for the 'messageReceive' event,
+   * Register a callback function for the 'messagesReceived' event.
+   * This function allows you to set up a listener for the 'messagesReceived' event,
    * which is triggered when a message is received via JSON-RPC.
    *
-   * @param callback - The callback function to be invoked when 'messageReceive' is triggered.
+   * @param callback - The callback function to be invoked when 'messagesReceived' is triggered.
    * The callback receives a `data` parameter of type `JsonRpcParamsMessage`, containing:
    *
-   * @param {MessageReceivedCallbackParams} data - The data received via the 'messageReceive' event.
+   * @param {MessagesReceivedCallbackParams} data - The data received via the 'messagesReceived' event.
    *
    * @param {string} data.connectionId - The ID of the connection associated with the message.
    * @param {QueuedMessage[]} data.message - Array of queued messages received.
    * @param {string} [data.id] - (Optional) The identifier for the JSON-RPC message.
    *
    * @example
-   * messageReceived((data: MessageReceivedCallbackParams) => {
+   * messagesReceived((data: MessageReceivedCallbackParams) => {
    *   const { connectionId, message } = data
    *   console.log('ConnectionId:', data.connectionId);
    *   console.log('Message:', message[0].id)
    * });
    */
-  messageReceived(callback: (data: MessageReceivedCallbackParams) => void): void {
-    this.messageReceivedCallback = callback
+  messagesReceived(callback: (data: MessagesReceivedCallbackParams) => void): void {
+    this.messagesReceivedCallback = callback
   }
 
   /**

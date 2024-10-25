@@ -9,7 +9,7 @@ The `MessagePickupRepositoryClient` is a client library designed to interact wit
 1. [Installation](#installation)
 2. [Available Methods](#available-methods)
    - [connect()](#connect)
-   - [messageReceived()](#messageReceived)
+   - [messagesReceived()](#messagesReceived)
    - [takeFromQueue()](#takeFromQueue)
    - [getAvailableMessageCount()](#getAvailableMessageCount)
    - [addMessage()](#addMessage)
@@ -40,9 +40,9 @@ Establishes a WebSocket connection to the server.
 
 ---
 
-### `messageReceived(callback)`
+### `messagesReceived(callback)`
 
-Registers a callback to handle `messageReceive` events from the WebSocket server. This method will be primarily used to receive new messages that are published by the server.
+Registers a callback to handle `messagesReceived` events from the WebSocket server. This method will be primarily used to receive new messages that are published by the server.
 
 - **Parameters**:
 
@@ -178,7 +178,7 @@ Disconnects from the WebSocket server.
 Here is a simple usage example:
 
 ```typescript
-import { MessagePickupRepositoryClient } from './MessagePickupRepositoryClient'
+import { MessagePickupRepositoryClient } from '@2060.io/message-pickup-repository-client'
 
 async function runClient() {
   const client = new MessagePickupRepositoryClient('ws://localhost:3500')
@@ -189,7 +189,7 @@ async function runClient() {
     console.log('Connected to the WebSocket server.')
 
     // Register message receive callback
-    client.messageReceived((data) => {
+    client.messagesReceived((data) => {
       console.log('Received message:', data)
     })
 

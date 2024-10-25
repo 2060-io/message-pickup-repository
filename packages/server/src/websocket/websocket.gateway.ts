@@ -62,7 +62,7 @@ export class WebsocketGateway implements OnModuleInit, OnModuleDestroy {
         port: WS_PORT,
       })
 
-      this.server.event('messageReceive')
+      this.server.event('messagesReceived')
       this.server.createError(500, 'Error initializing WebSocket server', {
         jsonrpc: '2.0',
         result: 'error',

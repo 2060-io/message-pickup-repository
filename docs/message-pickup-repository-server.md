@@ -113,7 +113,7 @@ To resolve synchronization across multiple instances the Message Pickup Reposito
 
 - Then a new message is received, the server sends a JSON-RPC response to the client with the new message data.
 
-- Once the server send JSON-RPC response, the client receives the notification with the message through its subscription to the `messageReceive` event. The client’s callback function is triggered with the message data.
+- Once the server send JSON-RPC response, the client receives the notification with the message through its subscription to the `messagesReceived` event. The client’s callback function is triggered with the message data.
 
 ---
 

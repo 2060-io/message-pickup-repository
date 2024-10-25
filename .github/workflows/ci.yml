@@ -55,14 +55,14 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           token: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Print release outputs for debugging
         continue-on-error: true
         run: |
           echo "Release outputs:"
           echo ${{ toJson(steps.release-please.outputs) }}
-        
- # Initiate release process if release was created
+
+  # Initiate release process if release was created
   release-client:
     if: contains(needs.release-please.outputs.paths_released, 'packages/client')
     runs-on: ubuntu-latest
@@ -86,7 +86,7 @@ jobs:
           npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-  
+
   release-server:
     if: contains(needs.release-please.outputs.paths_released, 'packages/server')
     runs-on: ubuntu-latest
@@ -94,7 +94,7 @@ jobs:
     env:
       DH_USERNAME: ${{secrets.DOCKER_HUB_LOGIN}}
       DH_TOKEN: ${{secrets.DOCKER_HUB_PWD}}
-      IMAGE_NAME: 'message-pickup-repository'      
+      IMAGE_NAME: 'message-pickup-repository'
       IMAGE_TAG: ${{ github.ref == 'refs/heads/main' && 'dev' || github.ref }}
     steps:
       - name: Checkout message-pickup-repository
@@ -115,9 +115,9 @@ jobs:
 
       - name: Build Docker image
         run: |
-            cp yarn.lock packages/server
-            cd packages/server
-            docker build -f Dockerfile -t $DH_USERNAME/$IMAGE_NAME:$IMAGE_TAG .
-  
+          cp yarn.lock packages/server
+          cd packages/server
+          docker build -f Dockerfile -t $DH_USERNAME/$IMAGE_NAME:$IMAGE_TAG .
+
       - name: Push to DockerHub
         run: docker push $DH_USERNAME/$IMAGE_NAME:$IMAGE_TAG

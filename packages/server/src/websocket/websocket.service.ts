@@ -576,7 +576,7 @@ export class WebsocketService {
    * @param {string} socket_id - The unique identifier of the WebSocket client to which the message will be sent.
    * @param {JsonRpcResponseSubscriber} message - The message to send, including:
    *   @property {string} jsonrpc - The JSON-RPC version, always '2.0'.
-   *   @property {string} method - The method being invoked, in this case, 'messageReceive'.
+   *   @property {string} method - The method being invoked, in this case, 'messagesReceived'.
    *   @property {Object} params - An object containing:
    *     @property {string} connectionId - The ID of the connection associated with the message.
    *     @property {QueuedMessage[]} message - An array of messages to be sent.
@@ -680,10 +680,10 @@ export class WebsocketService {
       // Parse and process the received message, and construct the JSON-RPC response
       const jsonRpcResponse: JsonRpcResponseSubscriber = {
         jsonrpc: '2.0',
-        method: 'messageReceive',
+        method: 'messagesReceived',
         params: {
           connectionId: channel, // The channel is treated as the connectionId
-          message: JSON.parse(message), // Parse the message to ensure it's valid JSON
+          messages: JSON.parse(message), // Parse the message to ensure it's valid JSON
           id: '',
         },
       }
