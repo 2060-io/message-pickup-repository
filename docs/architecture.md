@@ -43,6 +43,33 @@ MPR API consists mainly on messages to retrieve and add messages to pickup queue
 The protocol is built on top of JSON-RPC 2.0 using WebSocket as transport. All methods match as much as possible (in terms of name and params) those of credo-ts' `MessagePickupRepository` interface, but adds some others used to handle sessions (subscriptions to Redis cache).
 
 
+## Example DIDComm mediator deployment using MPR
+
+```plantuml
+@startuml
+
+component C1 as "Mediatee 1"
+component C2 as "Mediatee 2"
+component Mediator {
+component M1 as "Mediator Instance 1"
+component M2 as "Mediator Instance 2"
+component M3 as "Mediator Instance 3"
+}
+component Sender as "External Sender"
+component MPR as "Message Pickup Repository"
+interface API as "MPR API"
+
+C1 <-> M1: WebSocket
+C2 <--> M2: WebSocket
+M1 <--> API
+M2 <--> API
+API <-> MPR
+API <-- M3
+Sender --> M3: HTTP
+
+@enduml
+```
+
 ## Flows
 
 ### Live Mode Session Add/Remove
@@ -85,7 +112,7 @@ Client -> Server: addMessageToQueue(recipient, msg)
 Server -> Redis: publish(recipient, msg)
 alt "There is an ongoing Live Mode session"
 Server -> Client: messagesReceived(recipient, \n[pending_msgs, msg])
-else  "There is not an ongoinge LiveMode Session"
+else  "There is not an ongoing LiveMode Session"
 Server -> PNS: sendNotification
 end 
 @enduml
