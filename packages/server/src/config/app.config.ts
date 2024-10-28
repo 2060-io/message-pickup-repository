@@ -35,13 +35,34 @@ export default registerAs('appConfig', () => ({
   mongoDbUri: process.env.MONGODB_URI || 'mongodb://cloud-agent:cloud-agent@localhost:27017/MessagePickupRepository',
 
   /**
-   * The Redis database URL for connecting to the Redis server.
+   * Defines the Redis mode, which can be 'single' or 'cluster'.
+   * Defaults to 'single' if REDIS_TYPE is not set in the environment variables.
+   * @type {string}
+   */
+  redisType: process.env.REDIS_TYPE || 'single',
+
+  /**
+   * A comma-separated list of Redis nodes in 'host:port' format, used in cluster mode.
+   * Only relevant if REDIS_TYPE is set to 'cluster'.
+   * @type {string | undefined}
+   */
+  redisNodes: process.env.REDIS_NODES,
+
+  /**
+   * The NAT mapping for Redis nodes, defined in 'externalAddress:host:port' format.
+   * Useful for Redis cluster configurations with external IP mappings.
+   * @type {string | undefined}
+   */
+  redisNatmap: process.env.REDIS_NATMAP,
+  /**
+   * The Redis database URL for connecting to the Redis server Single Mode.
    * Defaults to a specified local Redis instance if REDIS_URL is not set in the environment variables.
    * @type {string}
    */
-  redisDbUrl: process.env.REDIS_URL || 'redis://192.168.100.84:6379',
+  redisDbUrl: process.env.REDIS_URL || 'redis://localhost:6379',
 
-  redisType: process.env.REDIS_TYPE || 'cluster',
-
+  /**
+   *Allows set threshold time to execute messagePersist module on milisecond
+   */
   thresholdTimestamp: parseInt(process.env.THRESHOLD_TIMESTAMP) || 60000,
 }))

@@ -10,25 +10,31 @@ import { ConfigModule, ConfigService } from '@nestjs/config'
       useFactory: (configService: ConfigService): RedisModuleOptions => {
         const redisType = configService.get<string>('appConfig.redisType', 'single')
         if (redisType === 'cluster') {
+          const nodes = configService
+            .get<string>('appConfig.redisNodes', '')
+            .split(',')
+            .map((node) => {
+              const [host, port] = node.split(':')
+              return { host, port: parseInt(port, 10) }
+            })
+          
+          const natMap = configService
+            .get<string>('appConfig.redisNatmap', '')
+            .split(',')
+            .reduce(
+              (map, entry) => {
+                const [externalAddress, externalPort, internalHost, internalPort] = entry.split(':')
+                map[`${externalAddress}:${externalPort}`] = { host: internalHost, port: parseInt(internalPort, 10) }
+                return map
+              },
+              {} as Record<string, { host: string; port: number }>,
+            )
+         
           return {
             type: 'cluster',
-            nodes: [
-              { host: 'localhost', port: 6371 },
-              { host: 'localhost', port: 6372 },
-              { host: 'localhost', port: 6373 },
-              { host: 'localhost', port: 6374 },
-              { host: 'localhost', port: 6375 },
-              { host: 'localhost', port: 6376 },
-            ],
+            nodes,
             options: {
-              natMap: {
-                '172.29.0.2:6379': { host: 'localhost', port: 6371 },
-                '172.29.0.3:6379': { host: 'localhost', port: 6372 },
-                '172.29.0.4:6379': { host: 'localhost', port: 6373 },
-                '172.29.0.5:6379': { host: 'localhost', port: 6374 },
-                '172.29.0.6:6379': { host: 'localhost', port: 6375 },
-                '172.29.0.7:6379': { host: 'localhost', port: 6376 },
-              },
+              natMap,
               redisOptions: {
                 connectTimeout: 10000, // Maximum wait time for connection in milliseconds
                 maxRetriesPerRequest: 5, // Maximum number of retries per request
