@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.0.5](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-server@v0.0.5...@2060.io/message-pickup-repository-server@v0.0.5) (2024-10-29)
+## [0.0.6](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-server@v0.0.5...@2060.io/message-pickup-repository-server@v0.0.5) (2024-10-29)
 
 
 ### Bug Fixes
