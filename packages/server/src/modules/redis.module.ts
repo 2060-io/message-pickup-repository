@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { Module, Logger } from '@nestjs/common'
 import { RedisModule, RedisModuleOptions } from '@nestjs-modules/ioredis'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 
@@ -8,7 +8,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config'
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService): RedisModuleOptions => {
+        const logger = new Logger('RedisModule')
         const redisType = configService.get<string>('appConfig.redisType', 'single')
+        logger.log(`[RedisModule] Configuring Redis with type: ${redisType}`)
         if (redisType === 'cluster') {
           const nodes = configService
             .get<string>('appConfig.redisNodes', '')
@@ -17,7 +19,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config'
               const [host, port] = node.split(':')
               return { host, port: parseInt(port, 10) }
             })
-          
+          logger.debug(`[RedisModule] Cluster Nodes: ${nodes}`)
           const natMap = configService
             .get<string>('appConfig.redisNatmap', '')
             .split(',')
@@ -29,7 +31,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config'
               },
               {} as Record<string, { host: string; port: number }>,
             )
-         
+          logger.debug(`[RedisModule] Cluster Nat: ${nodes}`)
           return {
             type: 'cluster',
             nodes,
