@@ -12,6 +12,18 @@
 
 * bump versions ([e5a39aa](https://github.com/2060-io/message-pickup-repository/commit/e5a39aae66abb33c313f51c8cdb796f5a914400a))
 
+## [0.0.5](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-server@v0.0.5...@2060.io/message-pickup-repository-server@v0.0.5) (2024-10-31)
+
+
+### Features
+
+* dynamically build connection to redis cluster ([#22](https://github.com/2060-io/message-pickup-repository/issues/22)) ([9bdb31b](https://github.com/2060-io/message-pickup-repository/commit/9bdb31b556feb4301d759b04182debde1c9b807e))
+
+
+### Bug Fixes
+
+* bump versions ([e5a39aa](https://github.com/2060-io/message-pickup-repository/commit/e5a39aae66abb33c313f51c8cdb796f5a914400a))
+
 ## [0.0.5](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-server-v0.0.6...@2060.io/message-pickup-repository-server@v0.0.5) (2024-10-30)
 
 
