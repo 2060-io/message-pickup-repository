@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.6](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-server@v0.0.5...@2060.io/message-pickup-repository-server@v0.0.6) (2024-11-06)
+
+
+### Features
+
+* Add handle instance execution to Message Persister service ([#30](https://github.com/2060-io/message-pickup-repository/issues/30)) ([a806663](https://github.com/2060-io/message-pickup-repository/commit/a806663a0fe9cbd833f7d87d6fff47817e08700e))
+
 ## [0.0.5](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-server@v0.0.5...@2060.io/message-pickup-repository-server@v0.0.5) (2024-10-31)
 
 
