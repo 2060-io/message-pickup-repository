@@ -76,7 +76,7 @@ describe('WebsocketService', () => {
     jest.spyOn(redisMock, 'lrange').mockResolvedValue([
       JSON.stringify({
         id: '1', // Usar 'id' en lugar de 'messageId'
-        encryptedMessage: 'test-message-1',
+        encryptedMessage: 'test-message-2',
         receivedAt: new Date().toISOString(),
       }),
     ])
@@ -85,7 +85,7 @@ describe('WebsocketService', () => {
     storeQueuedMessageMock.exec.mockResolvedValue([
       {
         id: '2', // MongoDB usa _id por defecto
-        encryptedMessage: 'test-message-2',
+        encryptedMessage: 'test-message-1',
         createdAt: new Date(),
       },
     ])
