@@ -65,4 +65,11 @@ export default registerAs('appConfig', () => ({
    *Allows set threshold time to execute messagePersist module on milisecond
    */
   thresholdTimestamp: parseInt(process.env.THRESHOLD_TIMESTAMP) || 60000,
+
+  /**
+   * The maximum total message size in bytes.
+   * Defaults to 1 MB (1 * 1024 * 1024 bytes) if MAX_TOTAL_MESSAGE_SIZE_MB is not set in the environment variables.
+   * @type {number}
+   */
+  maxMessageSizeBytes: (parseInt(process.env.MAX_MESSAGE_SIZE_BYTES, 10) || 1) * 1024 * 1024,
 }))

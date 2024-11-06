@@ -62,6 +62,7 @@ export class MessagePersister {
               connectionId: message.connectionId,
               recipientKeys: message.recipientDids,
               encryptedMessage: message.encryptedMessage,
+              encryptedMessageSize: message.encryptedMessageSize,
               state: message.state,
               createdAt: new Date(message.receivedAt),
             })

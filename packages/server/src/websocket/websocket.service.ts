@@ -65,54 +65,70 @@ export class WebsocketService {
    * @returns {Promise<QueuedMessage[]>} - A promise that resolves to an array of queued messages.
    */
   async takeFromQueue(dto: TakeFromQueueDto): Promise<QueuedMessage[]> {
-    const { connectionId, limit = 10, recipientDid } = dto
+    const { connectionId, recipientDid } = dto
+    const maxMessageSizeBytes = this.configService.get<number>('appConfig.maxMessageSizeBytes')
+    let currentSize = 0 // Accumulated size of messages in bytes
+    const combinedMessages: QueuedMessage[] = []
 
     this.logger.debug('[takeFromQueue] Method called with DTO:', dto)
 
     try {
-      // Retrieve messages from Redis
-      const redisMessagesRaw = await this.redis.lrange(`connectionId:${connectionId}:queuemessages`, 0, limit - 1)
-      const redisMessages: QueuedMessage[] = redisMessagesRaw.map((message) => {
-        const parsedMessage = JSON.parse(message)
-
-        // Map Redis data to QueuedMessage type
-        return {
-          id: parsedMessage.messageId,
-          receivedAt: new Date(parsedMessage.receivedAt),
-          encryptedMessage: parsedMessage.encryptedMessage,
-        }
-      })
-
-      this.logger.debug(
-        `[takeFromQueue] Fetched ${redisMessages.length} messages from Redis for connectionId ${connectionId}`,
-      )
-
-      // Query MongoDB with the provided connectionId or recipientDid, and state 'pending'
+      // Step 1: Retrieve messages from MongoDB, respecting the accumulated size limit
       const mongoMessages = await this.queuedMessage
         .find({
           $or: [{ connectionId }, { recipientKeys: recipientDid }],
           state: 'pending',
         })
         .sort({ createdAt: 1 })
-        .limit(limit)
-        .select({ messageId: 1, encryptedMessage: 1, createdAt: 1 })
+        .select({ messageId: 1, encryptedMessage: 1, createdAt: 1, encryptedMessageSize: 1 })
         .lean()
         .exec()
 
-      const mongoMappedMessages: QueuedMessage[] = mongoMessages.map((msg) => ({
-        id: msg.messageId,
-        receivedAt: msg.createdAt,
-        encryptedMessage: msg.encryptedMessage,
-      }))
+      for (const msg of mongoMessages) {
+        const messageSize = msg.encryptedMessageSize || Buffer.byteLength(JSON.stringify(msg.encryptedMessage), 'utf8')
+
+        // Check if adding this message would exceed the max message size limit
+        if (currentSize + messageSize > maxMessageSizeBytes) break
+
+        // Add message to the result and update the accumulated size
+        combinedMessages.push({
+          id: msg.messageId,
+          receivedAt: msg.createdAt,
+          encryptedMessage: msg.encryptedMessage,
+        })
+        currentSize += messageSize
+      }
+
+      // Step 2: Retrieve messages from Redis
+      const redisMessagesRaw = await this.redis.lrange(`connectionId:${connectionId}:queuemessages`, 0, -1)
+      for (const message of redisMessagesRaw) {
+        const parsedMessage = JSON.parse(message)
+        const messageSize =
+          parsedMessage.sizeInBytes || Buffer.byteLength(JSON.stringify(parsedMessage.encryptedMessage), 'utf8')
+
+        // Check if adding this message would exceed the max message size limit
+        if (currentSize + messageSize > maxMessageSizeBytes) break
+
+        // Add message to the result and update the accumulated size
+        combinedMessages.push({
+          id: parsedMessage.messageId,
+          receivedAt: new Date(parsedMessage.receivedAt),
+          encryptedMessage: parsedMessage.encryptedMessage,
+        })
+        currentSize += messageSize
+      }
 
       this.logger.debug(
-        `[takeFromQueue] Fetched ${mongoMappedMessages.length} messages from MongoDB for connectionId ${connectionId}`,
+        `[takeFromQueue] Fetched ${combinedMessages.length} messages from Redis for connectionId ${connectionId}`,
       )
-      // Combine messages from Redis and MongoDB
-      const combinedMessages: QueuedMessage[] = [...redisMessages, ...mongoMappedMessages]
 
-      this.logger.debug(`[takeFromQueue] combinedMessages for connectionId ${connectionId}: ${combinedMessages}`)
+      this.logger.debug(
+        `[takeFromQueue] Fetched ${combinedMessages.length} total messages (from Redis and MongoDB) in ${currentSize} MB for connectionId ${connectionId}`,
+      )
 
+      this.logger.debug(
+        `[takeFromQueue] Total message size to be sent for connectionId ${connectionId}: ${currentSize} bytes`,
+      )
       return combinedMessages
     } catch (error) {
       this.logger.error('[takeFromQueue] Error retrieving messages from Redis and MongoDB:', {
@@ -178,6 +194,11 @@ export class WebsocketService {
       messageId = new ObjectId().toString()
       receivedAt = new Date()
 
+      // Calculate the size in bytes of the encrypted message to add database
+      const encryptedMessageSize = Buffer.byteLength(JSON.stringify(payload), 'utf8')
+
+      this.logger.debug(`[addMessage] Size Encrypted Message ${encryptedMessageSize} `)
+
       // Create a message object to store in Redis
       const messageData = {
         messageId,
@@ -185,6 +206,7 @@ export class WebsocketService {
         recipientDids,
         encryptedMessage: payload,
         state: MessageState.pending,
+        encryptedMessageSize,
         receivedAt,
       }
 
