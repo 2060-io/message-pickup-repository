@@ -112,31 +112,31 @@ export class MessagePersister implements OnModuleDestroy {
   startMonitoring() {
     this.logger.log(`[startMonitoring] Initialize MessagePersister`)
     this.thresholdTimestamp = this.configService.get<number>('appConfig.thresholdTimestamp', 60000)
-    setInterval(() => this.migrateData(), this.thresholdTimestamp)
+    setInterval(() => this.persistMessages(), this.thresholdTimestamp)
   }
 
   // Migrates messages from Redis to MongoDB if they meet the age threshold
-  async migrateData() {
-    this.logger.log(`[migrateData] Initialize MessagePersister`)
+  async persistMessages() {
+    this.logger.log(`[persistMessages] Initialize MessagePersister`)
 
     const threshold = Date.now() - this.thresholdTimestamp
-    this.logger.log(`[migrateData] Threshold timestamp calculated: ${threshold}`)
+    this.logger.log(`[persistMessages] Threshold timestamp calculated: ${threshold}`)
 
     const connectionIds = await this.redis.keys('connectionId:*:queuemessages')
-    this.logger.log(`[migrateData] Found ${connectionIds.length} connectionIds matching the pattern`)
+    this.logger.log(`[persistMessages] Found ${connectionIds.length} connectionIds matching the pattern`)
 
     for (const fullKey of connectionIds) {
-      this.logger.log(`[migrateData] Processing Redis key: ${fullKey}`)
+      this.logger.log(`[persistMessages] Processing Redis key: ${fullKey}`)
       const messages = await this.redis.lrange(fullKey, 0, -1)
-      this.logger.log(`[migrateData] Found ${messages.length} messages in key: ${fullKey}`)
+      this.logger.log(`[persistMessages] Found ${messages.length} messages in key: ${fullKey}`)
 
       for (const messageData of messages) {
         const message = JSON.parse(messageData)
-        this.logger.log(`[migrateData] Processing message with messageId: ${message.messageId}`)
+        this.logger.log(`[persistMessages] Processing message with messageId: ${message.messageId}`)
         const receivedAtTimestamp = new Date(message.receivedAt).getTime()
 
         if (receivedAtTimestamp < threshold) {
-          this.logger.log(`[migrateData] Message is older than threshold, migrating...`)
+          this.logger.log(`[persistMessages] Message is older than threshold, migrating...`)
           try {
             await this.storeQueuedMessage.create({
               messageId: message.messageId,
@@ -148,17 +148,19 @@ export class MessagePersister implements OnModuleDestroy {
             })
             await this.redis.lrem(fullKey, 1, messageData)
             this.logger.log(
-              `[migrateData] Migrated and deleted message with key: ${fullKey} and messageId: ${message.messageId}`,
+              `[persistMessages] Migrated and deleted message with key: ${fullKey} and messageId: ${message.messageId}`,
             )
           } catch (error) {
-            this.logger.error('[migrateData] Failed to migrate message', {
+            this.logger.error('[persistMessages] Failed to migrate message', {
               fullKey,
               messageId: message.messageId,
               error,
             })
           }
         } else {
-          this.logger.log(`[migrateData] Message with messageId: ${message.messageId} is not old enough, skipping...`)
+          this.logger.log(
+            `[persistMessages] Message with messageId: ${message.messageId} is not old enough, skipping...`,
+          )
         }
       }
     }
