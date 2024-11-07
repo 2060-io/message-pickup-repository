@@ -71,7 +71,46 @@ describe('WebsocketService', () => {
     expect(service).toBeDefined()
   })
 
-  it('should takeFromQueue (Redis and MongoDB)', async () => {
+  it('should takeFromQueue (Redis and MongoDB) with size message', async () => {
+    // Mock configuration for Redis
+    jest.spyOn(redisMock, 'lrange').mockResolvedValue([
+      JSON.stringify({
+        id: '1', // Usar 'id' en lugar de 'messageId'
+        encryptedMessage: 'test-message-2',
+        receivedAt: new Date().toISOString(),
+      }),
+    ])
+
+    // Mock configuration for MongoDB
+    storeQueuedMessageMock.exec.mockResolvedValue([
+      {
+        id: '2', // MongoDB usa _id por defecto
+        encryptedMessage: 'test-message-1',
+        createdAt: new Date(),
+      },
+    ])
+
+    // Execute the takeFromQueue method
+    const result = await service.takeFromQueue({
+      connectionId: 'test-connection-id',
+      id: '',
+      limitSize: 1,
+    })
+
+    // Verify that Redis and MongoDB calls were made
+    expect(redisMock.lrange).toHaveBeenCalledWith('connectionId:test-connection-id:queuemessages', 0, -1)
+    expect(storeQueuedMessageMock.find).toHaveBeenCalledWith({
+      $or: [{ connectionId: 'test-connection-id' }, { recipientKeys: undefined }],
+      state: 'pending',
+    })
+
+    // Verify the combined result from Redis and MongoDB
+    expect(result).toHaveLength(2)
+    expect(result[0].encryptedMessage).toBe('test-message-1') // Verifica por 'id'
+    expect(result[1].encryptedMessage).toBe('test-message-2') // Verifica por 'id'
+  })
+
+  it('should takeFromQueue (Redis and MongoDB) with limit message', async () => {
     // Mock configuration for Redis
     jest.spyOn(redisMock, 'lrange').mockResolvedValue([
       JSON.stringify({
