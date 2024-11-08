@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.7](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-server@v0.0.6...@2060.io/message-pickup-repository-server@v0.0.7) (2024-11-08)
+
+
+### Features
+
+* support message retrieval limit based on byte count ([#32](https://github.com/2060-io/message-pickup-repository/issues/32)) ([0dc06f2](https://github.com/2060-io/message-pickup-repository/commit/0dc06f2ba6d4f3379ae05cca2d76f56bf66b9669))
+
 ## [0.0.6](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-server@v0.0.5...@2060.io/message-pickup-repository-server@v0.0.6) (2024-11-06)
 
 
