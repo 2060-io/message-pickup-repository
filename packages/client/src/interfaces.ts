@@ -1,4 +1,4 @@
-import { QueuedMessage } from '@credo-ts/core'
+import { QueuedMessage, TakeFromQueueOptions } from '@credo-ts/core'
 
 export interface RemoveAllMessagesOptions {
   connectionId: string
@@ -17,4 +17,8 @@ export interface AddLiveSessionOptions {
 export interface MessagesReceivedCallbackParams {
   connectionId: string
   messages: QueuedMessage[]
+}
+
+export interface ExtendedTakeFromQueueOptions extends TakeFromQueueOptions {
+  limitBytes?: number
 }

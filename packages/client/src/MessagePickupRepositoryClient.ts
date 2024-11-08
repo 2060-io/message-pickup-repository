@@ -5,6 +5,7 @@ import {
   ConnectionIdOptions,
   AddLiveSessionOptions,
   MessagesReceivedCallbackParams,
+  ExtendedTakeFromQueueOptions,
 } from './interfaces'
 import {
   AddMessageOptions,
@@ -12,7 +13,6 @@ import {
   MessagePickupRepository,
   QueuedMessage,
   RemoveMessagesOptions,
-  TakeFromQueueOptions,
 } from '@credo-ts/core'
 
 log.setLevel('info')
@@ -22,7 +22,10 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   private readonly logger = log
   private messagesReceivedCallback: ((data: MessagesReceivedCallbackParams) => void) | null = null
 
-  constructor(private readonly url: string) {}
+  constructor(
+    private readonly url: string,
+    private readonly maxReceiveBytes?: number,
+  ) {}
 
   /**
    * Connect to the WebSocket server.
@@ -90,21 +93,32 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   }
 
   /**
-   * Call the 'takeFromQueue' RPC method.
-   * This method sends a request to the WebSocket server to take messages from the queue.
-   * It expects the response to be an array of `QueuedMessage` objects.
+   * Calls the 'takeFromQueue' RPC method on the WebSocket server.
+   * This method sends a request to retrieve messages from the queue for the specified connection.
+   * It can retrieve messages up to a specified byte limit (`limitBytes`) or by a count limit (`limit`).
+   * The response is expected to be an array of `QueuedMessage` objects.
    *
-   * @param {TakeFromQueueOptions} params - The parameters to pass to the 'takeFromQueue' method, including:
+   * @param {ExtendedTakeFromQueueOptions} params - The parameters to pass to the 'takeFromQueue' method, including:
    *   @property {string} connectionId - The ID of the connection from which to take messages.
    *   @property {string} [recipientDid] - Optional DID of the recipient to filter messages by.
-   *   @property {number} [limit] - Optional maximum number of messages to take from the queue.
+   *   @property {number} [limit] - Optional maximum number of messages to take from the queue. Ignored if `limitBytes` is set.
+   *   @property {number} [limitBytes] - Optional maximum cumulative byte size of messages to retrieve.
    *   @property {boolean} [deleteMessages] - Optional flag indicating whether to delete the messages after retrieving them.
-   * @returns {Promise<QueuedMessage[]>} - The result from the WebSocket server, expected to be an array of `QueuedMessage`.
-   * @throws Will throw an error if the result is not an array or if there's any issue with the WebSocket call.
+   *   If provided, limits the retrieval by the total byte size of messages rather than by count.
+   *
+   * @returns {Promise<QueuedMessage[]>} - A promise that resolves to an array of `QueuedMessage` objects from the WebSocket server.
+   * @throws {Error} Will throw an error if the result is not an array of `QueuedMessage` objects,
+   * or if any issue occurs with the WebSocket call.
    */
-  async takeFromQueue(params: TakeFromQueueOptions): Promise<QueuedMessage[]> {
+  async takeFromQueue(params: ExtendedTakeFromQueueOptions): Promise<QueuedMessage[]> {
     try {
       const client = this.checkClient()
+
+      // Add limitBytes to params if maxReceiveBytes is set
+      if (this.maxReceiveBytes) {
+        params = { ...params, limitBytes: this.maxReceiveBytes }
+      }
+
       // Call the RPC method and store the result as 'unknown' type initially
       const result: unknown = await client.call('takeFromQueue', params, 2000)
 

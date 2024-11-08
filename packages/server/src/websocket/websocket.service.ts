@@ -55,21 +55,32 @@ export class WebsocketService {
 
   /**
    * Retrieves messages from both Redis and MongoDB based on the provided criteria.
-   * This method retrieves messages from Redis for the specified connection ID, as well as messages stored in MongoDB.
+   * Depending on the specified criteria, this method will retrieve messages either
+   * by a byte size limit or by a count limit, pulling messages from both Redis and MongoDB.
+   *
+   * If `limitBytes` is defined in the DTO, messages will be retrieved up to the specified byte limit
+   * using `takeMessagesWithByteCountLimit`. Otherwise, messages will be retrieved by a count limit
+   * using `takeMessagesWithMessageCountLimit`.
    *
    * @param {TakeFromQueueDto} dto - Data transfer object containing the query parameters.
    * @param {string} dto.connectionId - The unique identifier of the connection.
-   * @param {number} [dto.limit] - Optional limit on the number of messages to retrieve.
+   * @param {number} [dto.limit] - Optional limit on the number of messages to retrieve if `limitBytes` is not specified.
+   * @param {number} [dto.limitBytes] - Optional byte size limit for retrieving messages.
    * @param {boolean} [dto.deleteMessages] - Optional flag to determine if messages should be deleted after retrieval.
    * @param {string} [dto.recipientDid] - Optional recipient identifier for filtering messages.
+   * When set, retrieval is based on the cumulative byte size of messages rather than the count.
+   *
    * @returns {Promise<QueuedMessage[]>} - A promise that resolves to an array of queued messages.
+   * The array will contain messages retrieved either by byte size or by count, based on the criteria provided.
    */
   async takeFromQueue(dto: TakeFromQueueDto): Promise<QueuedMessage[]> {
-    const { limitSize } = dto
+    const { limitBytes } = dto
 
     this.logger.debug('[takeFromQueue] Method called with DTO:', dto)
 
-    return limitSize ? await this.takeMessagesWithSize(dto) : await this.takeMessagesWithLimit(dto)
+    return limitBytes
+      ? await this.takeMessagesWithByteCountLimit(dto)
+      : await this.takeMessagesWithMessageCountLimit(dto)
   }
 
   /**
@@ -128,9 +139,9 @@ export class WebsocketService {
       receivedAt = new Date()
 
       // Calculate the size in bytes of the encrypted message to add database
-      const encryptedMessageSize = Buffer.byteLength(JSON.stringify(payload), 'utf8')
+      const encryptedMessageByteCount = Buffer.byteLength(JSON.stringify(payload), 'utf8')
 
-      this.logger.debug(`[addMessage] Size Encrypted Message ${encryptedMessageSize} `)
+      this.logger.debug(`[addMessage] Size Encrypted Message ${encryptedMessageByteCount} `)
 
       // Create a message object to store in Redis
       const messageData = {
@@ -139,7 +150,7 @@ export class WebsocketService {
         recipientDids,
         encryptedMessage: payload,
         state: MessageState.pending,
-        encryptedMessageSize,
+        encryptedMessageByteCount,
         receivedAt,
       }
 
@@ -728,8 +739,8 @@ export class WebsocketService {
    * @returns {Promise<QueuedMessage[]>} - A promise that resolves to an array of queued messages.
    */
   private async takeMessagesWithByteCountLimit(dto: TakeFromQueueDto): Promise<QueuedMessage[]> {
-    const { connectionId, recipientDid, limitSize } = dto
-    const maxMessageSizeBytes = limitSize * 1024 * 1024
+    const { connectionId, recipientDid, limitBytes } = dto
+    const maxMessageSizeBytes = limitBytes
     let currentSize = 0
     const combinedMessages: QueuedMessage[] = []
 
@@ -741,12 +752,13 @@ export class WebsocketService {
           state: 'pending',
         })
         .sort({ createdAt: 1 })
-        .select({ messageId: 1, encryptedMessage: 1, createdAt: 1, encryptedMessageSize: 1 })
+        .select({ messageId: 1, encryptedMessage: 1, createdAt: 1, encryptedMessageByteCount: 1 })
         .lean()
         .exec()
 
       for (const msg of mongoMessages) {
-        const messageSize = msg.encryptedMessageSize || Buffer.byteLength(JSON.stringify(msg.encryptedMessage), 'utf8')
+        const messageSize =
+          msg.encryptedMessageByteCount || Buffer.byteLength(JSON.stringify(msg.encryptedMessage), 'utf8')
 
         if (currentSize + messageSize > maxMessageSizeBytes) break
 

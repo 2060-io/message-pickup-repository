@@ -94,7 +94,7 @@ describe('WebsocketService', () => {
     const result = await service.takeFromQueue({
       connectionId: 'test-connection-id',
       id: '',
-      limitSize: 1,
+      limitBytes: 1000000,
     })
 
     // Verify that Redis and MongoDB calls were made

@@ -63,6 +63,7 @@ Retrieves messages from the queue.
   - `connectionId: string`: ID of the connection.
   - `recipientDid?: string`: Optional DID of the recipient.
   - `limit?: number`: Optional limit on the number of messages.
+  - `limitBytes?: number`: Optional byte size limit for retrieving messages
   - `deleteMessages?: boolean`: Whether to delete the messages after retrieval.
 
 - **Returns**: `Promise<QueuedMessage[]>`
