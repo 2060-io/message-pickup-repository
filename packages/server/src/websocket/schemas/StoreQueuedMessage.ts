@@ -36,7 +36,7 @@ export class StoreQueuedMessage extends Document {
    * @type {number}
    */
   @Prop()
-  encryptedMessageSize?: number
+  encryptedMessageByteCount?: number
 
   /**
    * The recipient keys (DIDs or other identifiers) associated with the message.
