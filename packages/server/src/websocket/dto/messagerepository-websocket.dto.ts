@@ -29,7 +29,7 @@ export class TakeFromQueueDto {
 
   @IsOptional()
   @IsInt()
-  limitSize?: number
+  limitBytes?: number
 
   @IsOptional()
   @IsBoolean()
