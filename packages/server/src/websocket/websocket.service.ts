@@ -660,7 +660,7 @@ export class WebsocketService {
    * @param {TakeFromQueueDto} dto - Data transfer object containing query parameters.
    * @returns {Promise<QueuedMessage[]>} - A promise that resolves to an array of queued messages.
    */
-  private async takeMessagesWithLimit(dto: TakeFromQueueDto): Promise<QueuedMessage[]> {
+  private async takeMessagesWithMessageCountLimit(dto: TakeFromQueueDto): Promise<QueuedMessage[]> {
     const { connectionId, limit, recipientDid } = dto
 
     this.logger.debug('[takeMessagesWithLimit] Method called with DTO:', dto)
