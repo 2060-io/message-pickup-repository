@@ -2,7 +2,7 @@
   "name": "@2060.io/message-pickup-repository-client",
   "main": "build/index",
   "types": "build/index",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "files": [
     "build"
   ],
