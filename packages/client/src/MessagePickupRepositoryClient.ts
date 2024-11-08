@@ -21,11 +21,13 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   private client?: Client
   private readonly logger = log
   private messagesReceivedCallback: ((data: MessagesReceivedCallbackParams) => void) | null = null
+  private readonly url: string
+  private readonly maxReceiveBytes?: number
 
-  constructor(
-    private readonly url: string,
-    private readonly maxReceiveBytes?: number,
-  ) {}
+  constructor(options: { url: string; maxReceiveBytes?: number }) {
+    this.url = options.url
+    this.maxReceiveBytes = options.maxReceiveBytes
+  }
 
   /**
    * Connect to the WebSocket server.
