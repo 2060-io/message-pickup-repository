@@ -32,7 +32,7 @@ npm install rpc-websockets @nestjs/common
 
 ## Available Methods
 
-### `connect(options:{ agent })`
+### `connect()`
 
 Establishes a WebSocket connection to the server.
 
