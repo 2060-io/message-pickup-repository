@@ -21,6 +21,7 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   private client?: Client
   private readonly logger = log
   private messagesReceivedCallback: ((data: MessagesReceivedCallbackParams) => void) | null = null
+  private getDeviceTokenCallback?: (connectionId: string) => Promise<string | undefined>
   private readonly url: string
   private readonly maxReceiveBytes?: number
 
@@ -62,6 +63,14 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
     })
   }
 
+  /**
+   * Checks if the WebSocket client is initialized and returns it.
+   * If the client is not initialized, throws an error instructing to call `connect()` first.
+   *
+   * @private
+   * @throws {Error} Will throw an error if the client is not initialized.
+   * @returns {Client} The initialized WebSocket client instance.
+   */
   private checkClient(): Client {
     if (!this.client) {
       throw new Error('Client is not initialized. Call connect() first.')
@@ -92,6 +101,27 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
    */
   messagesReceived(callback: (data: MessagesReceivedCallbackParams) => void): void {
     this.messagesReceivedCallback = callback
+  }
+
+  /**
+   * Sets the callback function to retrieve the device token.
+   * This function is called whenever a token is needed, allowing dynamic retrieval based on the connection ID.
+   *
+   * @param callback - A function that receives a connectionId and returns a Promise resolving to a device token or undefined.
+   *
+   * @example
+   * // Example of setting the callback to retrieve the device token
+   * const client = new MessagePickupRepositoryClient({ url: 'wss://example.com' });
+   *
+   * const getDeviceToken = async (connectionId: string) => {
+   *   const connectionRecord = await agent.connections.findById(connectionId);
+   *   return connectionRecord?.getTag('device_token') as string | undefined;
+   * };
+   *
+   * client.notificationToken(getDeviceToken);
+   */
+  notificationToken(callback: (connectionId: string) => Promise<string | undefined>): void {
+    this.getDeviceTokenCallback = callback
   }
 
   /**
@@ -164,33 +194,38 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   }
 
   /**
-   * Call the 'addMessage' RPC method.
-   * This method sends a request to the WebSocket server to add a message to the queue.
-   * It expects the response to be a string or null.
+   * Calls the 'addMessage' RPC method.
+   * This function sends a request to the WebSocket server to add a message to the queue.
+   * It retrieves the device token (if available) and includes it in the parameters.
+   * Expects the response from the server to be a JSON string or an empty string if null.
    *
-   * @param {AddMessageOptions} params - The parameters to pass to the 'addMessage' method, including:
+   * @param {AddMessageOptions} params - Parameters for the 'addMessage' method, including:
    *   @property {string} connectionId - The ID of the connection to which the message will be added.
-   *   @property {string[]} recipientDids - An array of DIDs of the recipients for whom the message is intended.
+   *   @property {string[]} recipientDids - Array of DIDs for the intended recipients of the message.
    *   @property {EncryptedMessage} payload - The encrypted message content to be queued.
-   * @returns {Promise<string|null>} - The result from the WebSocket server, expected to be a string or null.
-   * @throws Will throw an error if the result is not an object, null, or if there's any issue with the WebSocket call.
+   *   @property {string} [token] - (Optional) A token associated with the device; will be populated if available.
+   * @returns {Promise<string>} - The server response, expected as a JSON string or an empty string if the response is null.
+   * @throws {Error} Will throw an error if the result is neither an object nor null, or if any issue occurs during the WebSocket call.
    */
   async addMessage(params: AddMessageOptions): Promise<string> {
     try {
       const client = this.checkClient()
-      // Call the RPC method and store the result as 'unknown' type initially
+
+      // Retrieve token using the callback, if set
+      params.token = this.getDeviceTokenCallback ? await this.getDeviceTokenCallback(params.connectionId) : undefined
+
+      // Call the 'addMessage' RPC method on the WebSocket server
       const result: unknown = await client.call('addMessage', params, 2000)
 
+      // Log the result and handle the response format
       this.logger.debug(`**** result: ${JSON.stringify(result, null, 2)} ***`)
 
-      // Check if the result is a string and cast it
-      if (result && typeof result === 'object') {
-        return JSON.stringify(result)
-      } else if (result === null) {
-        return ''
-      } else {
-        throw new Error('Unexpected result: Expected an object or null')
-      }
+      // Return JSON stringified result if it's an object, or an empty string if result is null
+      if (result === null) return ''
+      if (typeof result === 'object') return JSON.stringify(result)
+
+      // If result is neither an object nor null, throw an error
+      throw new Error('Unexpected result: Expected an object or null')
     } catch (error) {
       // Log the error and rethrow it for further handling
       this.logger.error('Error calling addMessage:', error)

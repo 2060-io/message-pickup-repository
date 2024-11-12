@@ -32,7 +32,7 @@ npm install rpc-websockets @nestjs/common
 
 ## Available Methods
 
-### `connect()`
+### `connect(options:{ agent })`
 
 Establishes a WebSocket connection to the server.
 
@@ -49,6 +49,19 @@ Registers a callback to handle `messagesReceived` events from the WebSocket serv
   - `callback`: A function that receives the `JsonRpcParamsMessage` containing:
     - `connectionId: string`: The connection ID.
     - `message: QueuedMessage[]`: Array of queued messages.
+
+- **Returns**: `void`
+
+---
+
+### `notificationToken(callback)`
+
+Registers a callback to retrieve the `device_token` associated with a specific connection from mediator. This method is primarily used to provide the token when sending messages to the WebSocket server.
+
+- **Parameters**:
+
+  - `callback`: A function that receives a `connectionId` as a parameter and returns a `Promise` that resolves to the device token or `undefined` if no token is available.
+    - `connectionId: string`: The connection ID for which to retrieve the token.
 
 - **Returns**: `void`
 
