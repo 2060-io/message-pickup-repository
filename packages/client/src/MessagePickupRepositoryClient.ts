@@ -6,6 +6,7 @@ import {
   AddLiveSessionOptions,
   MessagesReceivedCallbackParams,
   ExtendedTakeFromQueueOptions,
+  ExtendedAddMessageOptions,
 } from './interfaces'
 import {
   AddMessageOptions,
@@ -199,7 +200,7 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
    * It retrieves the device token (if available) and includes it in the parameters.
    * Expects the response from the server to be a JSON string or an empty string if null.
    *
-   * @param {AddMessageOptions} params - Parameters for the 'addMessage' method, including:
+   * @param {ExtendedAddMessageOptions} params - Parameters for the 'addMessage' method, including:
    *   @property {string} connectionId - The ID of the connection to which the message will be added.
    *   @property {string[]} recipientDids - Array of DIDs for the intended recipients of the message.
    *   @property {EncryptedMessage} payload - The encrypted message content to be queued.
@@ -207,7 +208,7 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
    * @returns {Promise<string>} - The server response, expected as a JSON string or an empty string if the response is null.
    * @throws {Error} Will throw an error if the result is neither an object nor null, or if any issue occurs during the WebSocket call.
    */
-  async addMessage(params: AddMessageOptions): Promise<string> {
+  async addMessage(params: ExtendedAddMessageOptions): Promise<string> {
     try {
       const client = this.checkClient()
 
