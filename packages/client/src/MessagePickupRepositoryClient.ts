@@ -151,11 +151,11 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
     try {
       const client = this.checkClient()
 
-      const connectionInfoCallback = this.setConnectionInfoCallback
-        ? await this.setConnectionInfoCallback(params.connectionId)
+      const connectionInfo = this.connectionInfoCallback
+        ? await this.connectionInfoCallback(params.connectionId)
         : undefined
 
-      const maxReceiveBytes = connectionInfoCallback?.maxReceiveBytes
+      const maxReceiveBytes = connectionInfo?.maxReceiveBytes
 
       // Add limitBytes to params if maxReceiveBytes is set
       if (maxReceiveBytes) {
