@@ -126,7 +126,7 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
    * client.setConnectionInfo(getConnectionInfo);
    */
   setConnectionInfo(callback: (connectionId: string) => Promise<ConnectionInfo | undefined>): void {
-    this.setConnectionInfoCallback = callback
+    this.connectionInfoCallback = callback
   }
 
   /**
