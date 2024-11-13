@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.7](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-client@v0.0.6...@2060.io/message-pickup-repository-client@v0.0.7) (2024-11-13)
+
+
+### Features
+
+* Add notification token callback to use en addMessage Method ([#35](https://github.com/2060-io/message-pickup-repository/issues/35)) ([19859c7](https://github.com/2060-io/message-pickup-repository/commit/19859c7ff2851744524a224c417fbfeda2720d5e))
+
 ## [0.0.6](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-client@v0.0.5...@2060.io/message-pickup-repository-client@v0.0.6) (2024-11-08)
 
 
