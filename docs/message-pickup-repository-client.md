@@ -54,16 +54,16 @@ Registers a callback to handle `messagesReceived` events from the WebSocket serv
 
 ---
 
-### `notificationToken(callback)`
+### `setConnectionInfo(callback)`
 
-Registers a callback to retrieve the `device_token` associated with a specific connection from mediator. This method is primarily used to provide the token when sending messages to the WebSocket server.
+Registers a callback function to retrieve connection-specific information based on a given `connectionId`. This callback provides the `ConnectionInfo` object, which contains details such as the FCM notification token and maximum bytes allowed for receiving messages. This function is useful for dynamically fetching connection-related information whenever it is required by the client.
 
 - **Parameters**:
 
-  - `callback`: A function that receives a `connectionId` as a parameter and returns a `Promise` that resolves to the device token or `undefined` if no token is available.
-    - `connectionId: string`: The connection ID for which to retrieve the token.
+  - `callback`: A function that takes a `connectionId` (string) and returns a `Promise` resolving to a `ConnectionInfo` object or `undefined` if no information is available for the given `connectionId`.
+    - `connectionId` (string): The ID of the connection for which to retrieve information.
 
-- **Returns**: `void`
+- **Returns**: `Promise<ConnectionInfo | undefined>`: The connection information, including: - `fcmNotificationToken` (optional, string): The FCM notification token for the specified connection. - `maxReceiveBytes` (optional, number): The maximum allowed bytes for receiving messages for this connection.
 
 ---
 

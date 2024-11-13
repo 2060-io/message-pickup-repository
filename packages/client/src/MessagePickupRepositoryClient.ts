@@ -7,6 +7,7 @@ import {
   MessagesReceivedCallbackParams,
   ExtendedTakeFromQueueOptions,
   ExtendedAddMessageOptions,
+  ConnectionInfo,
 } from './interfaces'
 import {
   AddMessageOptions,
@@ -22,13 +23,12 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   private client?: Client
   private readonly logger = log
   private messagesReceivedCallback: ((data: MessagesReceivedCallbackParams) => void) | null = null
-  private getDeviceTokenCallback?: (connectionId: string) => Promise<string | undefined>
+  private setConnectionInfoCallback?: (connectionId: string) => Promise<ConnectionInfo | undefined>
   private readonly url: string
-  private readonly maxReceiveBytes?: number
+ 
 
-  constructor(options: { url: string; maxReceiveBytes?: number }) {
+  constructor(options: { url: string }) {
     this.url = options.url
-    this.maxReceiveBytes = options.maxReceiveBytes
   }
 
   /**
@@ -105,24 +105,29 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   }
 
   /**
-   * Sets the callback function to retrieve the device token.
-   * This function is called whenever a token is needed, allowing dynamic retrieval based on the connection ID.
+   * Sets the callback function to retrieve connection-specific information.
+   * This callback provides the `ConnectionInfo` object, containing details like
+   * the FCM notification token and max receive bytes, based on the given `connectionId`.
    *
-   * @param callback - A function that receives a connectionId and returns a Promise resolving to a device token or undefined.
+   * @param {function} callback - A function that takes a `connectionId` as a parameter and returns
+   * a `Promise` that resolves to a `ConnectionInfo` object or `undefined` if no information is available.
    *
    * @example
-   * // Example of setting the callback to retrieve the device token
+   * // Example of setting the callback to retrieve connection-specific information
    * const client = new MessagePickupRepositoryClient({ url: 'wss://example.com' });
    *
-   * const getDeviceToken = async (connectionId: string) => {
+   * const getConnectionInfo = async (connectionId: string) => {
    *   const connectionRecord = await agent.connections.findById(connectionId);
-   *   return connectionRecord?.getTag('device_token') as string | undefined;
+   *   return {
+   *     fcmNotificationToken: connectionRecord?.getTag('device_token') as string | undefined,
+   *     maxReceiveBytes: config.messagePickupMaxReceiveBytes,
+   *   };
    * };
    *
-   * client.notificationToken(getDeviceToken);
+   * client.setConnectionInfo(getConnectionInfo);
    */
-  notificationToken(callback: (connectionId: string) => Promise<string | undefined>): void {
-    this.getDeviceTokenCallback = callback
+  setConnectionInfo(callback: (connectionId: string) => Promise<ConnectionInfo | undefined>): void {
+    this.setConnectionInfoCallback = callback
   }
 
   /**
@@ -147,9 +152,15 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
     try {
       const client = this.checkClient()
 
+      const connectionInfo = this.setConnectionInfoCallback
+        ? await this.setConnectionInfoCallback(params.connectionId)
+        : undefined
+
+      const maxReceiveBytes = connectionInfo?.maxReceiveBytes
+
       // Add limitBytes to params if maxReceiveBytes is set
-      if (this.maxReceiveBytes) {
-        params = { ...params, limitBytes: this.maxReceiveBytes }
+      if (maxReceiveBytes) {
+        params = { ...params, limitBytes: maxReceiveBytes }
       }
 
       // Call the RPC method and store the result as 'unknown' type initially
@@ -212,8 +223,13 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
     try {
       const client = this.checkClient()
 
-      // Retrieve token using the callback, if set
-      params.token = this.getDeviceTokenCallback ? await this.getDeviceTokenCallback(params.connectionId) : undefined
+      // Retrieve connection information using the callback, if set
+      const connectionInfo = this.setConnectionInfoCallback
+        ? await this.setConnectionInfoCallback(params.connectionId)
+        : undefined
+
+      // Set the token and max bytes from the connection info, if available
+      params.token = connectionInfo?.fcmNotificationToken
 
       // Call the 'addMessage' RPC method on the WebSocket server
       const result: unknown = await client.call('addMessage', params, 2000)

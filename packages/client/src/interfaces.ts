@@ -26,3 +26,8 @@ export interface ExtendedTakeFromQueueOptions extends TakeFromQueueOptions {
 export interface ExtendedAddMessageOptions extends AddMessageOptions {
   token?: string
 }
+
+export interface ConnectionInfo {
+  fcmNotificationToken?: string
+  maxReceiveBytes?: number
+}
