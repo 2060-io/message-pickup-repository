@@ -223,12 +223,12 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
       const client = this.checkClient()
 
       // Retrieve connection information using the callback, if set
-      const connectionInfoCallback = this.setConnectionInfoCallback
-        ? await this.setConnectionInfoCallback(params.connectionId)
+      const connectionInfo = this.connectionInfoCallback
+        ? await this.connectionInfoCallback(params.connectionId)
         : undefined
 
       // Set the token and max bytes from the connection info, if available
-      params.token = connectionInfoCallback?.fcmNotificationToken
+      params.token = connectionInfo?.fcmNotificationToken
 
       // Call the 'addMessage' RPC method on the WebSocket server
       const result: unknown = await client.call('addMessage', params, 2000)
