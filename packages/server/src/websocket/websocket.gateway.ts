@@ -68,7 +68,7 @@ export class WebsocketGateway implements OnModuleInit, OnModuleDestroy {
         result: 'error',
         id: 1,
       })
-      this.logger.error(`WebSocket server listening on port ${WS_PORT}`)
+      this.logger.log(`WebSocket server listening on port ${WS_PORT}`)
     } catch (error) {
       this.logger.error('Error during WebSocket server initialization', error.stack)
       throw error

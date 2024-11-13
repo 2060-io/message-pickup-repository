@@ -24,7 +24,6 @@ import { JsonRpcResponseSubscriber } from './interfaces/interfaces'
 @Injectable()
 export class WebsocketService {
   private readonly logger: Logger
-  private readonly httpService: HttpService
   private readonly redisSubscriber: Redis
   private readonly redisPublisher: Redis
   private server: Server
@@ -33,6 +32,7 @@ export class WebsocketService {
     @InjectModel(StoreQueuedMessage.name) private queuedMessage: Model<StoreQueuedMessage>,
     @InjectRedis() private readonly redis: Redis,
     private configService: ConfigService,
+    private readonly httpService: HttpService,
   ) {
     this.logger = new Logger(WebsocketService.name)
     this.redisSubscriber = this.redis.duplicate()
@@ -451,6 +451,19 @@ export class WebsocketService {
 
       // Retrieves the push notification URL from the configuration service
       const pushNotificationUrl = this.configService.get<string>('appConfig.pushNotificationUrl')
+
+      if (!pushNotificationUrl) {
+        this.logger?.error('[sendPushNotification] Push notification URL is not defined in appConfig')
+        return false
+      }
+
+      this.logger?.debug(`[sendPushNotification] pushNotificationUrl: ${pushNotificationUrl}`)
+      if (!token || !messageId) {
+        this.logger?.error('[sendPushNotification] Invalid token or messageId')
+        return false
+      }
+
+      this.logger?.debug(`[sendPushNotification] token: ${token} --- messageId: ${messageId}`)
 
       // Sends the push notification via HTTP POST request
       const response = await lastValueFrom(
