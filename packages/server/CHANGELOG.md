@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.8](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-server@v0.0.7...@2060.io/message-pickup-repository-server@v0.0.8) (2024-11-13)
+
+
+### Bug Fixes
+
+* HttpService Injection in WebsocketService for Push Notification Sending ([#37](https://github.com/2060-io/message-pickup-repository/issues/37)) ([52992d4](https://github.com/2060-io/message-pickup-repository/commit/52992d4d46e8c133f26b8213fa9ea30553eb6a63))
+
 ## [0.0.7](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-server@v0.0.6...@2060.io/message-pickup-repository-server@v0.0.7) (2024-11-08)
 
 
