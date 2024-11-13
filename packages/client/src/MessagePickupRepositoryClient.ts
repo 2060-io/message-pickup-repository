@@ -23,7 +23,7 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   private client?: Client
   private readonly logger = log
   private messagesReceivedCallback: ((data: MessagesReceivedCallbackParams) => void) | null = null
-  private setConnectionInfoCallback?: (connectionId: string) => Promise<ConnectionInfo | undefined>
+  private connectionInfoCallback?: (connectionId: string) => Promise<ConnectionInfo | undefined>
   private readonly url: string
 
   constructor(options: { url: string }) {
