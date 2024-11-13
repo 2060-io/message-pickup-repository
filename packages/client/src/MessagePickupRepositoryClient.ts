@@ -25,7 +25,6 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   private messagesReceivedCallback: ((data: MessagesReceivedCallbackParams) => void) | null = null
   private setConnectionInfoCallback?: (connectionId: string) => Promise<ConnectionInfo | undefined>
   private readonly url: string
- 
 
   constructor(options: { url: string }) {
     this.url = options.url
@@ -152,11 +151,11 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
     try {
       const client = this.checkClient()
 
-      const connectionInfo = this.setConnectionInfoCallback
+      const connectionInfoCallback = this.setConnectionInfoCallback
         ? await this.setConnectionInfoCallback(params.connectionId)
         : undefined
 
-      const maxReceiveBytes = connectionInfo?.maxReceiveBytes
+      const maxReceiveBytes = connectionInfoCallback?.maxReceiveBytes
 
       // Add limitBytes to params if maxReceiveBytes is set
       if (maxReceiveBytes) {
@@ -224,12 +223,12 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
       const client = this.checkClient()
 
       // Retrieve connection information using the callback, if set
-      const connectionInfo = this.setConnectionInfoCallback
+      const connectionInfoCallback = this.setConnectionInfoCallback
         ? await this.setConnectionInfoCallback(params.connectionId)
         : undefined
 
       // Set the token and max bytes from the connection info, if available
-      params.token = connectionInfo?.fcmNotificationToken
+      params.token = connectionInfoCallback?.fcmNotificationToken
 
       // Call the 'addMessage' RPC method on the WebSocket server
       const result: unknown = await client.call('addMessage', params, 2000)
