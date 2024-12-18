@@ -1,7 +1,7 @@
 import { Logger } from '@credo-ts/core'
 
 export interface ConnectionInfo {
-  fcmNotificationToken?: string
+  sendPushNotification?: (messageId: string) => Promise<void>
   maxReceiveBytes?: number
 }
 

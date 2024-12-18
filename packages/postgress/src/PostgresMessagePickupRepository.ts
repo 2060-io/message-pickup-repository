@@ -21,19 +21,18 @@ import { MessagePickupSession } from '@credo-ts/core/build/modules/message-picku
 import axios from 'axios'
 
 @injectable()
-export class MessagePickupRepositoryPg implements MessagePickupRepository {
+export class PostgresMessagePickupRepository implements MessagePickupRepository {
   private logger?: Logger
   public messagesCollection?: Pool
   private agent?: Agent
   private pubSubInstance?: PGPubsub
   private dbListener?: boolean
   private instanceName?: string
-  private connectionInfoCallback?: (connectionId: string) => Promise<ConnectionInfo | undefined>
   private postgresUser: string
   private postgresPassword: string
   private postgressHost: string
   private postgresDatabaseName: string
-  private fcmServiceBaseUrl: string
+  private connectionInfoCallback?: (connectionId: string) => Promise<ConnectionInfo | undefined>
 
   public constructor(options: PostgresMessagePickupRepositoryConfig) {
     const { logger, postgresUser, postgresPassword, postgressHost, postgresNameDatabase, fcmServiceBaseUrl } = options
@@ -43,17 +42,22 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
     this.postgresPassword = postgresPassword
     this.postgressHost = postgressHost
     this.postgresDatabaseName = postgresNameDatabase || 'messagepickuprepository'
-    this.fcmServiceBaseUrl = fcmServiceBaseUrl || 'http://localhost:3001/fcm/fcmNotificationSender/send'
   }
 
   /**
-   * Initializes the service by setting up the database, event listeners, and agent.
+   * Initializes the service by setting up the database, message listeners, and the agent.
+   * This method also configures the Pub/Sub system and registers event handlers.
    *
    * @param {Agent} agent - The agent instance to be initialized.
-   * @param {callback}
-   * @throws {Error} Throws an error if initialization fails.
+   * @param {(connectionId: string) => Promise<ConnectionInfo | undefined>} connectionInfoCallback -
+   * A callback function that retrieves connection information for a given connection ID.
+   * @returns {Promise<void>} A promise that resolves when the initialization is complete.
+   * @throws {Error} Throws an error if initialization fails due to database, Pub/Sub, or agent setup issues.
    */
-  public async initialize(agent: Agent): Promise<void> {
+  public async initialize(
+    agent: Agent,
+    connectionInfoCallback: (connectionId: string) => Promise<ConnectionInfo | undefined>,
+  ): Promise<void> {
     try {
       // Initialize the database
       await this.buildPgDatabase()
@@ -81,6 +85,7 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
       // Set instance variables
       this.agent = agent
       this.instanceName = os.hostname() // Retrieve hostname for instance identification
+      this.connectionInfoCallback = connectionInfoCallback
 
       // Register event handlers
       agent.events.on(
@@ -92,7 +97,7 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
           try {
             // Verify message sending method and delete session record from DB
             await this.checkQueueMessages(connectionId)
-            await this.removeLiveSessionFromDb(connectionId)
+            await this.removeLiveSessionOnDb(connectionId)
           } catch (handlerError) {
             this.logger?.error(`Error handling LiveSessionRemoved: ${handlerError}`)
           }
@@ -261,19 +266,15 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
         this.logger?.debug(`[addMessage] Live session verification result: ${JSON.stringify(liveSessionInPostgres)}`)
 
         if (!liveSessionInPostgres) {
-          // Send a push notification if no live session exists
-          const connectionRecord = await this.agent.connections.findById(connectionId)
-          const token = connectionRecord?.getTag('device_token') as string | null
+          if (this.connectionInfoCallback) {
+            const connectionInfo = await this.connectionInfoCallback(connectionId)
 
-          if (token) {
-            this.logger?.debug(
-              `[addMessage] Sending notification for connectionId: ${connectionId} with token: ${token}`,
-            )
-            await this.sendPushNotification(token, messageId)
+            if (connectionInfo?.sendPushNotification) {
+              await connectionInfo.sendPushNotification(messageId)
+            }
           } else {
-            this.logger?.debug(
-              `[addMessage] Notification not sent. No device token found for connectionId: ${connectionId}`,
-            )
+            this.logger?.error(`connectionInfoCallback is not defined`)
+            throw new Error(`connectionInfoCallback is not defined`)
           }
         } else if (this.dbListener) {
           // Publish to the Pub/Sub channel if a live session exists on another instance
@@ -548,7 +549,7 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
    *This method remove connectionId record to DB upon LiveSessionRemove event
    * @param connectionId
    */
-  private async removeLiveSessionFromDb(connectionId: string): Promise<void> {
+  private async removeLiveSessionOnDb(connectionId: string): Promise<void> {
     this.logger?.debug(`[removeLiveSessionFromDb] initializing remove LiveSession to connectionId ${connectionId}`)
     if (!connectionId) throw new Error('connectionId is not defined')
     try {
@@ -564,53 +565,5 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
     } catch (error) {
       this.logger?.error(`[removeLiveSessionFromDb] Error removing LiveSession: ${error}`)
     }
-  }
-
-  private async sendPushNotification(token: string, messageId: string): Promise<void> {
-    try {
-      this.logger?.debug(`[sendFmcNotification] Initialize send notification`)
-
-      const fcmResponse = await axios.post(this.fcmServiceBaseUrl, {
-        token,
-        messageId,
-      })
-      this.logger?.debug(`[sendFmcNotification] FCM response ${fcmResponse}`)
-      if (fcmResponse.data.success) {
-        this.logger?.debug(
-          `[sendFcmNotification] Success sending FCM notification: ${JSON.stringify(fcmResponse.data)}`,
-        )
-      } else {
-        this.logger?.error(
-          `[sendFcmNotification] FCM notification was not successful: ${JSON.stringify(fcmResponse.data)}`,
-        )
-      }
-      return fcmResponse.data.success
-    } catch (error) {
-      this.logger?.error(`[sendFcmNotification] Error sending FCM notification: ${error}`)
-    }
-  }
-
-  /**
-   * Sets the callback function to retrieve connection-specific information.
-   * This callback provides the `ConnectionInfo` object, containing details like
-   * the FCM notification token and max receive bytes, based on the given `connectionId`.
-   *
-   * @param {function} callback - A function that takes a `connectionId` as a parameter and returns
-   * a `Promise` that resolves to a `ConnectionInfo` object or `undefined` if no information is available.
-   *
-   * @example
-   *
-   * const getConnectionInfo = async (connectionId: string) => {
-   *   const connectionRecord = await agent.connections.findById(connectionId);
-   *   return {
-   *     fcmNotificationToken: connectionRecord?.getTag('device_token') as string | undefined,
-   *     maxReceiveBytes: config.messagePickupMaxReceiveBytes,
-   *   };
-   * };
-   *
-   * client.setConnectionInfo(getConnectionInfo);
-   */
-  setConnectionInfo(callback: (connectionId: string) => Promise<ConnectionInfo | undefined>): void {
-    this.connectionInfoCallback = callback
   }
 }
