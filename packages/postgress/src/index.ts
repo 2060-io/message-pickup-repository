@@ -1,1 +1,1 @@
-export { MessagePickupRepositoryPg } from './PostgresMessagePickupRepository'
+export { PostgresMessagePickupRepository } from './PostgresMessagePickupRepository'
