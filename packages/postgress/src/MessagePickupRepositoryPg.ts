@@ -1,7 +1,6 @@
 import {
   AddMessageOptions,
   Agent,
-  EncryptedMessage,
   GetAvailableMessageCountOptions,
   injectable,
   Logger,
@@ -16,15 +15,8 @@ import {
 import { Pool, Client } from 'pg'
 import PGPubsub from 'pg-pubsub'
 import * as os from 'os'
-import {
-  MessageState,
-  POSTGRES_PASSWORD,
-  POSTGRES_USER,
-  POSTGRES_HOST,
-  FCM_SERVICE_BASE_URL,
-} from '../config/constants'
-import { createTableMessage, tableNameLive, createTableLive } from '../config/dbCollections'
-import { ConnectionInfo } from './interfaces'
+import { createTableMessage, createTableLive, messagesTableName, liveSessionTableName } from '../config/dbCollections'
+import { ConnectionInfo, PostgresMessagePickupRepositoryConfig } from './interfaces'
 import { MessagePickupSession } from '@credo-ts/core/build/modules/message-pickup/MessagePickupSession'
 import axios from 'axios'
 
@@ -34,51 +26,60 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
   public messagesCollection?: Pool
   private agent?: Agent
   private pubSubInstance?: PGPubsub
-  private dbChannel?: string
   private dbListener?: boolean
   private instanceName?: string
   private connectionInfoCallback?: (connectionId: string) => Promise<ConnectionInfo | undefined>
+  private postgresUser: string
+  private postgresPassword: string
+  private postgressHost: string
+  private postgresDatabaseName: string
+  private fcmServiceBaseUrl: string
 
-  public constructor(logger?: Logger) {
+  public constructor(options: PostgresMessagePickupRepositoryConfig) {
+    const { logger, postgresUser, postgresPassword, postgressHost, postgresNameDatabase, fcmServiceBaseUrl } = options
+
     this.logger = logger
+    this.postgresUser = postgresUser
+    this.postgresPassword = postgresPassword
+    this.postgressHost = postgressHost
+    this.postgresDatabaseName = postgresNameDatabase || 'messagepickuprepository'
+    this.fcmServiceBaseUrl = fcmServiceBaseUrl || 'http://localhost:3001/fcm/fcmNotificationSender/send'
   }
 
   /**
    * Initializes the service by setting up the database, event listeners, and agent.
    *
    * @param {Agent} agent - The agent instance to be initialized.
-   * @param {boolean} dbListener - Indicates if the pubsub listener should be active.
+   * @param {callback}
    * @throws {Error} Throws an error if initialization fails.
    */
-  public async initialize(agent: Agent, dbListener: boolean): Promise<void> {
+  public async initialize(agent: Agent): Promise<void> {
     try {
       // Initialize the database
       await this.buildPgDatabase()
       this.logger?.info(`The database has been initialized successfully`)
 
-      // Configure PostgreSQL pool for the messages collection
+      // Configure PostgreSQL pool for the messages collections
       this.messagesCollection = new Pool({
-        user: POSTGRES_USER,
-        host: POSTGRES_HOST,
-        database: 'messagepickuprepository',
-        password: POSTGRES_PASSWORD,
+        user: this.postgresUser,
+        password: this.postgresPassword,
+        host: this.postgressHost,
+        database: this.postgresDatabaseName,
         port: 5432,
       })
-      this.logger?.debug(`[initialize] Listener status: ${dbListener}`)
+      this.logger?.debug(`[initialize] Listener status: ${this.dbListener}`)
 
       // Initialize Pub/Sub instance if database listener is enabled
-      if (dbListener) {
-        this.logger?.debug(`[initialize] Initializing pubSubInstance with listener: ${dbListener}`)
-        this.pubSubInstance = new PGPubsub(
-          `postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}/messagepickuprepository`,
-        )
 
-        this.initializeMessageListener('newMessage')
-      }
+      this.logger?.debug(`[initialize] Initializing pubSubInstance with listener: ${this.dbListener}`)
+      this.pubSubInstance = new PGPubsub(
+        `postgres://${this.postgresUser}:${this.postgresPassword}@${this.postgressHost}/${this.postgresDatabaseName}`,
+      )
+
+      await this.initializeMessageListener('newMessage')
 
       // Set instance variables
-      this.dbListener = dbListener // Activate Pub/Sub listener
-      this.agent = agent // Assign agent instance
+      this.agent = agent
       this.instanceName = os.hostname() // Retrieve hostname for instance identification
 
       // Register event handlers
@@ -268,7 +269,7 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
             this.logger?.debug(
               `[addMessage] Sending notification for connectionId: ${connectionId} with token: ${token}`,
             )
-            await this.pushNotification(token, messageId)
+            await this.sendPushNotification(token, messageId)
           } else {
             this.logger?.debug(
               `[addMessage] Notification not sent. No device token found for connectionId: ${connectionId}`,
@@ -387,19 +388,19 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
    */
   private async buildPgDatabase(): Promise<void> {
     this.logger?.info(`[buildPgDatabase] PostgresDbService Initializing`)
-    const databaseName = 'messagepickuprepository'
-    const tableNameMessage = 'storequeuedmessage'
+
+    //const tableNameMessage = 'storequeuedmessage'
 
     const clientConfig = {
-      user: POSTGRES_USER,
-      host: POSTGRES_HOST,
-      password: POSTGRES_PASSWORD,
+      user: this.postgresUser,
+      host: this.postgressHost,
+      password: this.postgresPassword,
       port: 5432,
     }
 
     const poolConfig = {
       ...clientConfig,
-      database: databaseName,
+      database: this.postgresDatabaseName,
     }
 
     const client = new Client(clientConfig)
@@ -408,13 +409,13 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
       await client.connect()
 
       // Check if the database already exists.
-      const result = await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [databaseName])
+      const result = await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [this.postgresDatabaseName])
       this.logger?.debug(`[buildPgDatabase] PostgresDbService exist ${result.rowCount}`)
 
       if (result.rowCount === 0) {
         // If it doesn't exist, create the database.
-        await client.query(`CREATE DATABASE ${databaseName}`)
-        this.logger?.info(`[buildPgDatabase] PostgresDbService Database "${databaseName}" created.`)
+        await client.query(`CREATE DATABASE ${this.postgresDatabaseName}`)
+        this.logger?.info(`[buildPgDatabase] PostgresDbService Database "${this.postgresDatabaseName}" created.`)
       }
 
       // Create a new client connected to the specific database.
@@ -424,23 +425,23 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
         await dbClient.connect()
 
         // Check if the 'queuedmessages' table exists.
-        const messageTableResult = await dbClient.query(`SELECT to_regclass('${tableNameMessage}')`)
+        const messageTableResult = await dbClient.query(`SELECT to_regclass('${messagesTableName}')`)
         if (!messageTableResult.rows[0].to_regclass) {
           // If it doesn't exist, create the 'storequeuedmessage' table.
           await dbClient.query(createTableMessage)
-          this.logger?.info(`[buildPgDatabase] PostgresDbService Table "${tableNameMessage}" created.`)
+          this.logger?.info(`[buildPgDatabase] PostgresDbService Table "${messagesTableName}" created.`)
         }
 
         // Check if the table exists.
-        const liveTableResult = await dbClient.query(`SELECT to_regclass('${tableNameLive}')`)
+        const liveTableResult = await dbClient.query(`SELECT to_regclass('${liveSessionTableName}')`)
         if (!liveTableResult.rows[0].to_regclass) {
           // If it doesn't exist, create the table.
           await dbClient.query(createTableLive)
-          this.logger?.info(`[buildPgDatabase] PostgresDbService Table "${tableNameLive}" created.`)
+          this.logger?.info(`[buildPgDatabase] PostgresDbService Table "${liveSessionTableName}" created.`)
         } else {
           // If the table exists, clean it (truncate or delete, depending on your requirements).
-          await dbClient.query(`TRUNCATE TABLE ${tableNameLive}`)
-          this.logger?.info(`[buildPgDatabase] PostgresDbService Table "${tableNameLive}" cleared.`)
+          await dbClient.query(`TRUNCATE TABLE ${liveSessionTableName}`)
+          this.logger?.info(`[buildPgDatabase] PostgresDbService Table "${liveSessionTableName}" cleared.`)
         }
       } finally {
         await dbClient.end()
@@ -547,7 +548,6 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
    *This method remove connectionId record to DB upon LiveSessionRemove event
    * @param connectionId
    */
-
   private async removeLiveSessionFromDb(connectionId: string): Promise<void> {
     this.logger?.debug(`[removeLiveSessionFromDb] initializing remove LiveSession to connectionId ${connectionId}`)
     if (!connectionId) throw new Error('connectionId is not defined')
@@ -566,11 +566,11 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
     }
   }
 
-  private async pushNotification(token: string, messageId: string): Promise<void> {
+  private async sendPushNotification(token: string, messageId: string): Promise<void> {
     try {
       this.logger?.debug(`[sendFmcNotification] Initialize send notification`)
 
-      const fcmResponse = await axios.post(FCM_SERVICE_BASE_URL, {
+      const fcmResponse = await axios.post(this.fcmServiceBaseUrl, {
         token,
         messageId,
       })

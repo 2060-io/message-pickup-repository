@@ -1,7 +1,7 @@
-export const tableNameMessage = 'storequeuedmessage'
+export const messagesTableName = 'storequeuedMessage'
 
 export const createTableMessage = `
-CREATE TABLE IF NOT EXISTS ${tableNameMessage} (
+CREATE TABLE IF NOT EXISTS ${messagesTableName} (
   id VARCHAR(20) DEFAULT substr(md5(random()::text), 1, 20) PRIMARY KEY,
   connectionId VARCHAR(255),
   recipientKeys TEXT[],
@@ -10,18 +10,18 @@ CREATE TABLE IF NOT EXISTS ${tableNameMessage} (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS "${tableNameMessage}_connectionId_index" ON "queuedmessages" (connectionId);
-CREATE INDEX IF NOT EXISTS "${tableNameMessage}_created_at_index" ON "queuedmessages" (created_at);
+CREATE INDEX IF NOT EXISTS "${messagesTableName}_connectionId_index" ON "queuedmessages" (connectionId);
+CREATE INDEX IF NOT EXISTS "${messagesTableName}_created_at_index" ON "queuedmessages" (created_at);
 `
 
-export const tableNameLive = 'storelivesession'
+export const liveSessionTableName = 'storelivesession'
 
 export const createTableLive = `
-CREATE TABLE IF NOT EXISTS ${tableNameLive} (
+CREATE TABLE IF NOT EXISTS ${liveSessionTableName} (
   sessionid VARCHAR(255) PRIMARY KEY,
   connectionid VARCHAR(50),
   instance VARCHAR(50),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS "${tableNameLive}_connectionid" ON "${tableNameLive}" USING btree ("connectionid");`
+CREATE INDEX IF NOT EXISTS "${liveSessionTableName}_connectionid" ON "${liveSessionTableName}" USING btree ("connectionid");`

@@ -1,0 +1,1 @@
+export { MessagePickupRepositoryPg } from './MessagePickupRepositoryPg'
