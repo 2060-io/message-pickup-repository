@@ -105,7 +105,7 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
 
         try {
           // Add the live session record to the database
-          await this.addLiveSessionFromDb(liveSessionData, this.instanceName!)
+          await this.addLiveSessionOnDb(liveSessionData, this.instanceName!)
         } catch (handlerError) {
           this.logger?.error(`Error handling LiveSessionSaved: ${handlerError}`)
         }
@@ -233,7 +233,7 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
 
     try {
       // Retrieve live session details for the given connection ID
-      const liveSession = await this.getLocalliveSession(connectionId)
+      const localLiveSession = await this.findLocalLiveSession(connectionId)
 
       // Insert the message into the database
       const query = `
@@ -241,7 +241,7 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
       VALUES($1, $2, $3, $4) 
       RETURNING id
     `
-      const state = liveSession ? 'sending' : 'pending'
+      const state = localLiveSession ? 'sending' : 'pending'
       const result = await this.messagesCollection?.query(query, [connectionId, recipientDids, payload, state])
 
       const messageId = result?.rows[0].id
@@ -249,18 +249,18 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
       this.logger?.debug(`[addMessage] Message added with ID: ${messageId} for connectionId: ${connectionId}`)
 
       // Process the message based on live session status
-      if (liveSession) {
+      if (localLiveSession) {
         this.logger?.debug(`[addMessage] Live session exists for connectionId: ${connectionId}`)
         await this.agent.messagePickup.deliverMessages({
-          pickupSessionId: liveSession.id,
+          pickupSessionId: localLiveSession.id,
           messages: [{ id: messageId, encryptedMessage: payload }],
         })
       } else {
         // Verify if a live session exists on another instance
-        const verifyInstance = await this.getLiveSessionFromDB(connectionId)
-        this.logger?.debug(`[addMessage] Live session verification result: ${JSON.stringify(verifyInstance)}`)
+        const liveSessionInPostgres = await this.findLiveSessionInDb(connectionId)
+        this.logger?.debug(`[addMessage] Live session verification result: ${JSON.stringify(liveSessionInPostgres)}`)
 
-        if (!verifyInstance) {
+        if (!liveSessionInPostgres) {
           // Send a push notification if no live session exists
           const connectionRecord = await this.agent.connections.findById(connectionId)
           const token = connectionRecord?.getTag('device_token') as string | null
@@ -357,7 +357,7 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
         )
 
         // Fetch the local live session for the given connectionId
-        const pickupLiveSession = await this.getLocalliveSession(connectionId)
+        const pickupLiveSession = await this.findLocalLiveSession(connectionId)
 
         if (pickupLiveSession) {
           this.logger?.debug(
@@ -489,7 +489,7 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
    * @param connectionId
    * @returns
    */
-  private async getLocalliveSession(connectionId: string): Promise<MessagePickupSession | undefined> {
+  private async findLocalLiveSession(connectionId: string): Promise<MessagePickupSession | undefined> {
     this.logger?.debug(`[getLocalliveSession] Verify current active live mode for connectionId ${connectionId}`)
 
     try {
@@ -505,21 +505,21 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
    * @param connectionId
    * @returns liveSession object or false
    */
-  private async getLiveSessionFromDB(connectionId: string): Promise<any | boolean> {
+  private async findLiveSessionInDb(connectionId: string): Promise<MessagePickupSession | undefined> {
     this.logger?.debug(`[getLiveSessionFromDB] initializing find registry for connectionId ${connectionId}`)
     if (!connectionId) throw new Error('connectionId is not defined')
     try {
       const queryLiveSession = await this.messagesCollection?.query(
-        `SELECT * FROM storelivesession WHERE connectionid = $1 LIMIT $2`,
+        `SELECT sessionid, connectionid, protocolVersion, role FROM storelivesession WHERE connectionid = $1 LIMIT $2`,
         [connectionId, 1],
       )
       // Check if liveSession is not empty (record found)
       const recordFound = queryLiveSession && queryLiveSession.rows && queryLiveSession.rows.length > 0
       this.logger?.debug(`[getLiveSessionFromDB] record found status ${recordFound} to connectionId ${connectionId}`)
-      return recordFound ? queryLiveSession.rows[0] : false
+      return recordFound ? queryLiveSession.rows[0] : undefined
     } catch (error) {
       this.logger?.debug(`[getLiveSessionFromDB] Error find to connectionId ${connectionId}`)
-      return false // Return false in case of an error
+      return undefined // Return false in case of an error
     }
   }
 
@@ -528,14 +528,14 @@ export class MessagePickupRepositoryPg implements MessagePickupRepository {
    * @param connectionId
    * @param instance
    */
-  private async addLiveSessionFromDb(session: MessagePickupSession, instance: string): Promise<void> {
-    const { id, connectionId } = session
+  private async addLiveSessionOnDb(session: MessagePickupSession, instance: string): Promise<void> {
+    const { id, connectionId, protocolVersion, role } = session
     this.logger?.debug(`[addLiveSessionFromDb] initializing add LiveSession DB to connectionId ${connectionId}`)
     if (!session) throw new Error('session is not defined')
     try {
       const insertMessageDB = await this.messagesCollection?.query(
-        'INSERT INTO storelivesession (sessionid, connectionid, instance) VALUES($1, $2, $3) RETURNING sessionid',
-        [id, connectionId, instance],
+        'INSERT INTO storelivesession (sessionid, connectionid, protocolVersion, role, instance) VALUES($1, $2, $3, $4, $5) RETURNING sessionid',
+        [id, connectionId, protocolVersion, role, instance],
       )
       const liveSessionId = insertMessageDB?.rows[0].sessionid
       this.logger?.debug(`[addLiveSessionFromDb] add liveSession to ${connectionId} and result ${liveSessionId}`)

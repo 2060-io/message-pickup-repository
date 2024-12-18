@@ -20,6 +20,8 @@ export const createTableLive = `
 CREATE TABLE IF NOT EXISTS ${liveSessionTableName} (
   sessionid VARCHAR(255) PRIMARY KEY,
   connectionid VARCHAR(50),
+  protocolVersion VARCHAR(50),
+  role VARCHAR(50),
   instance VARCHAR(50),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
