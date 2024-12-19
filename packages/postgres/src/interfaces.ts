@@ -10,5 +10,4 @@ export interface PostgresMessagePickupRepositoryConfig {
   postgresPassword: string
   postgresHost: string
   postgresDatabaseName?: string
-  fcmServiceBaseUrl?: string
 }
