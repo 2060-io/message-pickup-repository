@@ -23,24 +23,24 @@ import axios from 'axios'
 @injectable()
 export class PostgresMessagePickupRepository implements MessagePickupRepository {
   private logger?: Logger
-  public messagesCollection?: Pool
+  private messagesCollection?: Pool
   private agent?: Agent
   private pubSubInstance?: PGPubsub
   private dbListener?: boolean
   private instanceName?: string
   private postgresUser: string
   private postgresPassword: string
-  private postgressHost: string
+  private postgresHost: string
   private postgresDatabaseName: string
   private connectionInfoCallback?: (connectionId: string) => Promise<ConnectionInfo | undefined>
 
   public constructor(options: PostgresMessagePickupRepositoryConfig) {
-    const { logger, postgresUser, postgresPassword, postgressHost, postgresDatabaseName, fcmServiceBaseUrl } = options
+    const { logger, postgresUser, postgresPassword, postgresHost, postgresDatabaseName, fcmServiceBaseUrl } = options
 
     this.logger = logger
     this.postgresUser = postgresUser
     this.postgresPassword = postgresPassword
-    this.postgressHost = postgressHost
+    this.postgresHost = postgresHost
     this.postgresDatabaseName = postgresDatabaseName || 'messagepickuprepository'
   }
 
@@ -54,10 +54,10 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
    * @returns {Promise<void>} A promise that resolves when the initialization is complete.
    * @throws {Error} Throws an error if initialization fails due to database, Pub/Sub, or agent setup issues.
    */
-  public async initialize(
-    agent: Agent,
-    connectionInfoCallback: (connectionId: string) => Promise<ConnectionInfo | undefined>,
-  ): Promise<void> {
+  public async initialize(options: {
+    agent: Agent
+    connectionInfoCallback: (connectionId: string) => Promise<ConnectionInfo | undefined>
+  }): Promise<void> {
     try {
       // Initialize the database
       await this.buildPgDatabase()
@@ -67,7 +67,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
       this.messagesCollection = new Pool({
         user: this.postgresUser,
         password: this.postgresPassword,
-        host: this.postgressHost,
+        host: this.postgresHost,
         database: this.postgresDatabaseName,
         port: 5432,
       })
@@ -77,18 +77,18 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
 
       this.logger?.debug(`[initialize] Initializing pubSubInstance with listener: ${this.dbListener}`)
       this.pubSubInstance = new PGPubsub(
-        `postgres://${this.postgresUser}:${this.postgresPassword}@${this.postgressHost}/${this.postgresDatabaseName}`,
+        `postgres://${this.postgresUser}:${this.postgresPassword}@${this.postgresHost}/${this.postgresDatabaseName}`,
       )
 
       await this.initializeMessageListener('newMessage')
 
       // Set instance variables
-      this.agent = agent
+      this.agent = options.agent
       this.instanceName = os.hostname() // Retrieve hostname for instance identification
-      this.connectionInfoCallback = connectionInfoCallback
+      this.connectionInfoCallback = options.connectionInfoCallback
 
       // Register event handlers
-      agent.events.on(
+      options.agent.events.on(
         MessagePickupEventTypes.LiveSessionRemoved,
         async (data: MessagePickupLiveSessionRemovedEvent) => {
           const connectionId = data.payload.session.connectionId
@@ -104,17 +104,20 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
         },
       )
 
-      agent.events.on(MessagePickupEventTypes.LiveSessionSaved, async (data: MessagePickupLiveSessionSavedEvent) => {
-        const liveSessionData = data.payload.session
-        this.logger?.info(`*** Session saved for connectionId: ${liveSessionData.connectionId} ***`)
+      options.agent.events.on(
+        MessagePickupEventTypes.LiveSessionSaved,
+        async (data: MessagePickupLiveSessionSavedEvent) => {
+          const liveSessionData = data.payload.session
+          this.logger?.info(`*** Session saved for connectionId: ${liveSessionData.connectionId} ***`)
 
-        try {
-          // Add the live session record to the database
-          await this.addLiveSessionOnDb(liveSessionData, this.instanceName!)
-        } catch (handlerError) {
-          this.logger?.error(`Error handling LiveSessionSaved: ${handlerError}`)
-        }
-      })
+          try {
+            // Add the live session record to the database
+            await this.addLiveSessionOnDb(liveSessionData, this.instanceName!)
+          } catch (handlerError) {
+            this.logger?.error(`Error handling LiveSessionSaved: ${handlerError}`)
+          }
+        },
+      )
     } catch (error) {
       this.logger?.error(`[initialize] Initialization failed: ${error}`)
       throw new Error(`Failed to initialize the service: ${error}`)
@@ -336,7 +339,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
     }
   }
 
-  public async disposeDB() {
+  public async shutdown() {
     this.logger?.info(`[disposeDB] Close connection to postgres`)
     await this.messagesCollection?.end()
   }
@@ -347,7 +350,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
    * @param {string} channel - The name of the channel to subscribe to.
    * @returns {Promise<void>} A promise resolving when the listener is initialized.
    */
-  public async initializeMessageListener(channel: string): Promise<void> {
+  private async initializeMessageListener(channel: string): Promise<void> {
     this.logger?.info(`[getListenerPublishDb] Initializing method for channel: ${channel}`)
 
     try {
@@ -394,7 +397,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
 
     const clientConfig = {
       user: this.postgresUser,
-      host: this.postgressHost,
+      host: this.postgresHost,
       password: this.postgresPassword,
       port: 5432,
     }

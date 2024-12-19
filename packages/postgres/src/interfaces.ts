@@ -8,7 +8,7 @@ export interface PostgresMessagePickupRepositoryConfig {
   logger?: Logger
   postgresUser: string
   postgresPassword: string
-  postgressHost: string
+  postgresHost: string
   postgresDatabaseName?: string
   fcmServiceBaseUrl?: string
 }
