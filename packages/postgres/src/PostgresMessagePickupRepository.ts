@@ -35,13 +35,13 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
   private connectionInfoCallback?: (connectionId: string) => Promise<ConnectionInfo | undefined>
 
   public constructor(options: PostgresMessagePickupRepositoryConfig) {
-    const { logger, postgresUser, postgresPassword, postgressHost, postgresNameDatabase, fcmServiceBaseUrl } = options
+    const { logger, postgresUser, postgresPassword, postgressHost, postgresDatabaseName, fcmServiceBaseUrl } = options
 
     this.logger = logger
     this.postgresUser = postgresUser
     this.postgresPassword = postgresPassword
     this.postgressHost = postgressHost
-    this.postgresDatabaseName = postgresNameDatabase || 'messagepickuprepository'
+    this.postgresDatabaseName = postgresDatabaseName || 'messagepickuprepository'
   }
 
   /**

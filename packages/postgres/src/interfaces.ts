@@ -2,7 +2,6 @@ import { Logger } from '@credo-ts/core'
 
 export interface ConnectionInfo {
   sendPushNotification?: (messageId: string) => Promise<void>
-  maxReceiveBytes?: number
 }
 
 export interface PostgresMessagePickupRepositoryConfig {
@@ -10,6 +9,6 @@ export interface PostgresMessagePickupRepositoryConfig {
   postgresUser: string
   postgresPassword: string
   postgressHost: string
-  postgresNameDatabase?: string
+  postgresDatabaseName?: string
   fcmServiceBaseUrl?: string
 }
