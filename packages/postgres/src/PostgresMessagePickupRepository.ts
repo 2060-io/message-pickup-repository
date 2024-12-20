@@ -21,6 +21,7 @@ import {
   messagesTableName,
   liveSessionTableName,
   indexLiveSessionTable,
+  indexMessageTable,
 } from '../config/dbCollections'
 import { ConnectionInfo, PostgresMessagePickupRepositoryConfig } from './interfaces'
 import { MessagePickupSession } from '@credo-ts/core/build/modules/message-pickup/MessagePickupSession'
@@ -432,7 +433,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
         if (!messageTableResult.rows[0].to_regclass) {
           // If it doesn't exist, create the table.
           await dbClient.query(createTableMessage)
-          await dbClient.query(indexLiveSessionTable)
+          await dbClient.query(indexMessageTable)
           this.logger?.info(`[buildPgDatabase] PostgresDbService Table "${messagesTableName}" created.`)
         }
 
