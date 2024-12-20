@@ -1,4 +1,4 @@
-export const messagesTableName = 'storequeuedmessage'
+export const messagesTableName = 'queuedmessage'
 
 export const createTableMessage = `
 CREATE TABLE IF NOT EXISTS ${messagesTableName} (
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS ${messagesTableName} (
 );
 `
 
-export const liveSessionTableName = 'storelivesession'
+export const liveSessionTableName = 'livesession'
 
 export const createTableLive = `
 CREATE TABLE IF NOT EXISTS ${liveSessionTableName} (
