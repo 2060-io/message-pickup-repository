@@ -1,4 +1,4 @@
-export const messagesTableName = 'storequeuedMessage'
+export const messagesTableName = 'storequeuedmessage'
 
 export const createTableMessage = `
 CREATE TABLE IF NOT EXISTS ${messagesTableName} (
@@ -9,9 +9,6 @@ CREATE TABLE IF NOT EXISTS ${messagesTableName} (
   state VARCHAR(50),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE INDEX IF NOT EXISTS "${messagesTableName}_connectionId_index" ON "queuedmessages" (connectionId);
-CREATE INDEX IF NOT EXISTS "${messagesTableName}_created_at_index" ON "queuedmessages" (created_at);
 `
 
 export const liveSessionTableName = 'storelivesession'
@@ -24,6 +21,8 @@ CREATE TABLE IF NOT EXISTS ${liveSessionTableName} (
   role VARCHAR(50),
   instance VARCHAR(50),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+);`
 
-CREATE INDEX IF NOT EXISTS "${liveSessionTableName}_connectionid" ON "${liveSessionTableName}" USING btree ("connectionid");`
+export const indexMessageTable = `CREATE INDEX IF NOT EXISTS "${messagesTableName}_connectionId_index" ON "${messagesTableName}" (connectionId);`
+
+export const indexLiveSessionTable = `CREATE INDEX IF NOT EXISTS "${liveSessionTableName}_connectionid" ON "${liveSessionTableName}" USING btree ("connectionid");`
