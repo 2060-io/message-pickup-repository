@@ -20,12 +20,11 @@ import {
   createTableLive,
   messagesTableName,
   liveSessionTableName,
-  indexLiveSessionTable,
-  indexMessageTable,
+  liveSessionTableIndex,
+  messageTableIndex,
 } from '../config/dbCollections'
 import { ConnectionInfo, PostgresMessagePickupRepositoryConfig } from './interfaces'
 import { MessagePickupSession } from '@credo-ts/core/build/modules/message-pickup/MessagePickupSession'
-import axios from 'axios'
 
 @injectable()
 export class PostgresMessagePickupRepository implements MessagePickupRepository {
@@ -433,7 +432,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
         if (!messageTableResult.rows[0].to_regclass) {
           // If it doesn't exist, create the table.
           await dbClient.query(createTableMessage)
-          await dbClient.query(indexMessageTable)
+          await dbClient.query(messageTableIndex)
           this.logger?.info(`[buildPgDatabase] PostgresDbService Table "${messagesTableName}" created.`)
         }
 
@@ -442,7 +441,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
         if (!liveTableResult.rows[0].to_regclass) {
           // If it doesn't exist, create the table.
           await dbClient.query(createTableLive)
-          await dbClient.query(indexLiveSessionTable)
+          await dbClient.query(liveSessionTableIndex)
           this.logger?.info(`[buildPgDatabase] PostgresDbService Table "${liveSessionTableName}" created.`)
         } else {
           // If the table exists, clean it (truncate or delete, depending on your requirements).

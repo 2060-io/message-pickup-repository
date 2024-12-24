@@ -2,24 +2,21 @@
 
 ## [0.0.7](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-client@v0.0.6...@2060.io/message-pickup-repository-client@v0.0.7) (2024-11-13)
 
-
 ### Features
 
-* Add notification token callback to use en addMessage Method ([#35](https://github.com/2060-io/message-pickup-repository/issues/35)) ([19859c7](https://github.com/2060-io/message-pickup-repository/commit/19859c7ff2851744524a224c417fbfeda2720d5e))
+- Add notification token callback to use en addMessage Method ([#35](https://github.com/2060-io/message-pickup-repository/issues/35)) ([19859c7](https://github.com/2060-io/message-pickup-repository/commit/19859c7ff2851744524a224c417fbfeda2720d5e))
 
 ## [0.0.6](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-client@v0.0.5...@2060.io/message-pickup-repository-client@v0.0.6) (2024-11-08)
 
-
 ### Features
 
-* support message retrieval limit based on byte count ([#32](https://github.com/2060-io/message-pickup-repository/issues/32)) ([0dc06f2](https://github.com/2060-io/message-pickup-repository/commit/0dc06f2ba6d4f3379ae05cca2d76f56bf66b9669))
+- support message retrieval limit based on byte count ([#32](https://github.com/2060-io/message-pickup-repository/issues/32)) ([0dc06f2](https://github.com/2060-io/message-pickup-repository/commit/0dc06f2ba6d4f3379ae05cca2d76f56bf66b9669))
 
 ## [0.0.5](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-client@v0.0.4...@2060.io/message-pickup-repository-client@v0.0.5) (2024-10-29)
 
-
 ### Bug Fixes
 
-* bump versions ([e5a39aa](https://github.com/2060-io/message-pickup-repository/commit/e5a39aae66abb33c313f51c8cdb796f5a914400a))
+- bump versions ([e5a39aa](https://github.com/2060-io/message-pickup-repository/commit/e5a39aae66abb33c313f51c8cdb796f5a914400a))
 
 ## [0.0.4](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-client@v0.0.3...@2060.io/message-pickup-repository-client@v0.0.4) (2024-10-18)
 

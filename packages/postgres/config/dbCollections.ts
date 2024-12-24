@@ -23,6 +23,6 @@ CREATE TABLE IF NOT EXISTS ${liveSessionTableName} (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );`
 
-export const indexMessageTable = `CREATE INDEX IF NOT EXISTS "${messagesTableName}_connectionId_index" ON "${messagesTableName}" (connectionId);`
+export const messageTableIndex = `CREATE INDEX IF NOT EXISTS "${messagesTableName}_connectionId_index" ON "${messagesTableName}" (connectionId);`
 
-export const indexLiveSessionTable = `CREATE INDEX IF NOT EXISTS "${liveSessionTableName}_connectionid" ON "${liveSessionTableName}" USING btree ("connectionid");`
+export const liveSessionTableIndex = `CREATE INDEX IF NOT EXISTS "${liveSessionTableName}_connectionid" ON "${liveSessionTableName}" USING btree ("connectionid");`

@@ -22,7 +22,6 @@ To use this module, install package in your Didcomm Mediator App:
 
 ```bash
 npm i @2060.io/credo-ts-message-pickup-repository-pg
-
 ```
 
 ## Usage
@@ -43,7 +42,9 @@ const messageRepository = new PostgresMessagePickupRepository({
 
 ### Initializing the Repository
 
-To start using the PostgresMessagePickupRepository, initialize it with an agent and a callback function for retrieving connection information.
+To start using the `PostgresMessagePickupRepository`, initialize it with an agent and a callback function for retrieving connection information.
+
+Note that in this example, notification token is stored as a tag in connection records, so it is used to determine whether to create a Push notification callback or not for a given DIDComm connection.
 
 ```javascript
 const connectionInfoCallback = async (connectionId) => {
@@ -56,117 +57,49 @@ const connectionInfoCallback = async (connectionId) => {
 await messagePickupRepository.initialize({ agent, connectionInfoCallback })
 ```
 
-### How to implement credo-ts-message-pickup-repository-pg in Didcomm Mediator
+### Using with a Credo-based DIDComm Mediator
 
-In this section, we will explain in detail how to integrate the PostgresMessagePickupRepository into the [2060.io/Didcomm-mediator](https://github.com/2060-io/didcomm-mediator) with the following steps:
-
-1. Ensure that the PostgreSQL database definition parameters are defined in the CloudAgentOptions interface, into CloudAgent.ts file
+This full example shows how `PostgresMessagePickupRepository` is created an initialized alongside an `Agent` instance:
 
 ```javascript
-export interface CloudAgentOptions {
-  config: InitConfig
-  port: number
-  did?: string
-  enableHttp?: boolean
-  enableWs?: boolean
-  dependencies: AgentDependencies
-  messagePickupRepositoryWebSocketUrl?: string
-  messagePickupMaxReceiveBytes?: number
-  // postgres variables
-  postgresUser?: string
-  postgresPassword?: string
-  postgresHost?: string
-  postgresDatabaseName?: string
+import { Agent, MediatorModule, MessagePickupModule } from '@credo-ts/core'
+import { agentDependencies } from '@credo-ts/node'
+import { MessageForwardingStrategy } from '@credo-ts/core/build/modules/routing/MessageForwardingStrategy'
+import { PostgresMessagePickupRepository } from './PostgresMessagePickupRepository'
+
+const messagePickupRepository = new PostgresMessagePickupRepository({
+  postgresHost: 'postgres',
+  postgresUser: 'user',
+  postgresPassword: 'pass',
+})
+const agent = new Agent({
+  dependencies: agentDependencies,
+  config: { label: 'Test' },
+  modules: {
+    mediator: new MediatorModule({ messageForwardingStrategy: MessageForwardingStrategy.QueueOnly }),
+    messagePickup: new MessagePickupModule({
+      messagePickupRepository,
+    }),
+  },
+})
+
+const notificationSender = // { your implementation of a Push notification service }
+const connectionInfoCallback = async (connectionId: string) => {
+  const connectionRecord = await agent.connections.findById(connectionId)
+
+  const token = connectionRecord?.getTag('device_token') as string | null
+
+  return {
+    sendPushNotification: token
+      ? (messageId: string) => {
+          notificationSender.send(token, messageId)
+        }
+      : undefined,
+  }
 }
+
+await messagePickupRepository.initialize({ agent, connectionInfoCallback })
+await agent.initialize()
 ```
 
-2. Ensure that within the `run()` function in `index.ts`, when instantiating the `initCloudAgent` function, the connection attributes for the PostgreSQL database are included.
-
-```javascript
-async function run() {
-  logger.info(`Cloud Agent started on port ${AGENT_PORT}`)
-  try {
-    await initCloudAgent({
-      config: {
-        label: AGENT_NAME,
-        endpoints: AGENT_ENDPOINTS,
-        walletConfig: {
-          id: WALLET_NAME,
-          key: WALLET_KEY,
-          keyDerivationMethod: keyDerivationMethodMap[KEY_DERIVATION_METHOD ?? KeyDerivationMethod.Argon2IMod],
-          storage: POSTGRES_HOST ? askarPostgresConfig : undefined,
-        },
-        autoUpdateStorageOnStartup: true,
-        backupBeforeStorageUpdate: false,
-        logger: new AgentLogger(AGENT_LOG_LEVEL),
-      },
-      did: AGENT_PUBLIC_DID,
-      port: AGENT_PORT,
-      enableWs: WS_SUPPORT,
-      enableHttp: HTTP_SUPPORT,
-      dependencies: agentDependencies,
-      messagePickupRepositoryWebSocketUrl: MPR_WS_URL,
-      messagePickupMaxReceiveBytes: MPR_MAX_RECEIVE_BYTES,
-      // postgres variables
-      postgresUser: POSTGRES_USER,
-      postgresPassword: POSTGRES_PASSWORD,
-      postgresHost: POSTGRES_HOST,
-      postgresDatabaseName: POSTGRES_DATABASE_NAME,
-    })
-  } catch (error) {
-    logger.error(`${error}`)
-    process.exit(1)
-  }
-
-  logger.info(`Cloud Agent initialized OK`)
-}
-```
-
-3. Configure the `PostgresMessagePickupRepository` during the initialization of the Didcomm Mediator in the `initCloudAgent.ts` file as follows:
-
-```javascript
-
-import { MessagePickupRepositoryClient } from '@2060.io/credo-ts-message-pickup-repository-pg'
-import { ConnectionInfo } from '@2060.io/credo-ts-message-pickup-repository-pg/build/interfaces'
-
-export const initCloudAgent = async (config: CloudAgentOptions) => {
-  const logger = config.config.logger ?? new ConsoleLogger(LogLevel.off)
-  const publicDid = config.did
-
- const messageRepository = config.postgresHost
-    ? PostgresMessagePickupRepository({
-        logger: logger,
-        postgresUser: config.postgresUser,
-        postgresPassword: config.postgresPassword,
-        postgresHost: config.postgresHost,
-      })
-    : new InMemoryMessagePickupRepository(new LocalFcmNotificationSender(logger), logger)
-
-  if (!config.enableHttp && !config.enableWs) {
-    throw new Error('No transport has been enabled. Set at least one of HTTP and WS')
-  }
-
-  const agent = createCloudAgent(config, messageRepository)
-
-  if (messageRepository instanceof PostgresMessagePickupRepository) {
-
-  // Define callback to retrieve ConnectionInfo if you need
-  const connectionInfoCallback = async (connectionId) => {
-          const connectionRecord = await this.agent.connections.findById(connectionId)
-          const token = connectionRecord?.getTag('device_token') as string | null
-          return {
-   sendPushNotification: token ? (messageId) => { this.notificationSender.send(token, messageId) }: undefined,
-    }
-  }
-  // Initalize
-  await messageRepository.initialize({ agent, connectionInfoCallback })
-
-  } else if (messageRepository instanceof InMemoryMessagePickupRepository) {
-    messageRepository.setAgent(agent)
-  }
-
-  // The rest of the code ...
-}
-```
-
-With these steps, you can now use the PostgresMessagePickupRepository integrated into a Didcomm Mediator. Have fun!
+With these steps, you can now use the `PostgresMessagePickupRepository` with your Credo-based DIDComm mediator. Have fun!
