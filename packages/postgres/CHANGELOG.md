@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.6](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/credo-ts-message-pickup-repository-pg@v0.0.5...@2060.io/credo-ts-message-pickup-repository-pg@v0.0.6) (2025-01-09)
+
+
+### Features
+
+* Add change to publish postgres moduleto npm ([#45](https://github.com/2060-io/message-pickup-repository/issues/45)) ([718b672](https://github.com/2060-io/message-pickup-repository/commit/718b6720934fc8d3a8dd5916c4417653a0226ae6))
+
 ## [0.0.5](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/credo-ts-message-pickup-repository-pg-v0.0.1...@2060.io/credo-ts-message-pickup-repository-pg@v0.0.5) (2025-01-09)
 
 
