@@ -22,6 +22,8 @@ To use this module, install package in your Didcomm Mediator App:
 
 ```bash
 npm i @2060.io/credo-ts-message-pickup-repository-pg
+
+yarn add @2060.io/credo-ts-message-pickup-repository-pg
 ```
 
 ## Usage
