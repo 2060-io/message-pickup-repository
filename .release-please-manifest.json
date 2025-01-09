@@ -1,4 +1,5 @@
 {
   "packages/client": "0.0.7",
-  "packages/server": "0.0.8"
+  "packages/server": "0.0.8",
+  "packages/postgres": "0.0.1"
 }
