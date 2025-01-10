@@ -85,7 +85,7 @@ const agent = new Agent({
   },
 })
 
-const notificationSender = // { your implementation of a Push notification service }
+const notificationSender = // { your implementation of a Push notification service here }
 const connectionInfoCallback = async (connectionId: string) => {
   const connectionRecord = await agent.connections.findById(connectionId)
 
