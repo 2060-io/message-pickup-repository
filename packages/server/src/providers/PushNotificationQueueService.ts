@@ -8,8 +8,8 @@ interface QueueItem {
 }
 
 @Injectable()
-export class QueueService {
-  private readonly logger = new Logger(QueueService.name)
+export class PushNotificationQueueService {
+  private readonly logger = new Logger(PushNotificationQueueService.name)
   private queue: { [token: string]: BehaviorSubject<QueueItem> } = {}
 
   addToQueue(token: string, messageId: string): Observable<void> {

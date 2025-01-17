@@ -6,9 +6,9 @@ import { StoreQueuedMessageSchema, StoreQueuedMessage } from './schemas/StoreQue
 import { StoreLiveSessionSchema, StoreLiveSession } from './schemas/StoreLiveSession'
 import { MessagePersister } from './services/MessagePersister'
 import { HttpModule } from '@nestjs/axios'
-import { FcmNotificationSender } from '../providers/firebase-config'
-import { QueueService } from '../providers/queue-service'
-import { ApnNotificationSender } from '../providers/apns-config'
+import { FcmNotificationSender } from '../providers/FcmNotificationSender'
+import { QueueService } from '../providers/PushNotificationQueueService'
+import { ApnNotificationSender } from '../providers/ApnNotificationSender'
 
 @Module({
   imports: [

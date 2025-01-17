@@ -111,3 +111,14 @@ export class SendNotificationDto {
   @IsString({ message: 'MessageId must be a string' })
   messageId: string
 }
+export type SendNotificationResponseDto =
+  | {
+      success: boolean
+      response: string
+      error?: undefined
+    }
+  | {
+      error: string
+      success?: boolean
+      response?: undefined
+    }

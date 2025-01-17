@@ -3,6 +3,7 @@ import * as admin from 'firebase-admin'
 import { credential } from 'firebase-admin'
 import { ConfigService } from '@nestjs/config'
 import * as fs from 'fs'
+import { SendNotificationResponseDto } from 'src/websocket/dto/messagerepository-websocket.dto'
 
 @Injectable()
 export class FcmNotificationSender {
@@ -51,7 +52,10 @@ export class FcmNotificationSender {
    * @returns {Promise<{ success: boolean, response?: any, message?: string, error?: any }>}
    * - An object indicating the success or failure of the notification sending process.
    */
-  public async sendPushNotification(registrationToken: string, messageId: string) {
+  public async sendPushNotification(
+    registrationToken: string,
+    messageId: string,
+  ): Promise<SendNotificationResponseDto> {
     try {
       Logger.debug(`[sendPushNotification] ** initialize to token: ${registrationToken} *** messageId: ${messageId} **`)
 
