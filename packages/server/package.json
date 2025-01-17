@@ -46,6 +46,8 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "apn": "^2.2.0",
+    "firebase-admin": "11.0.0",
     "@nestjs/cli": "^10.0.0",
     "@nestjs/schematics": "^10.0.0",
     "@nestjs/testing": "^10.0.0",

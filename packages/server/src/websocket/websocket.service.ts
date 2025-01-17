@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { ConfigService } from '@nestjs/config'
 import { Model } from 'mongoose'
@@ -11,6 +11,7 @@ import {
   ConnectionIdDto,
   AddLiveSessionDto,
   RemoveAllMessagesDto,
+  SendNotificationDto,
 } from './dto/messagerepository-websocket.dto'
 import { StoreQueuedMessage } from './schemas/StoreQueuedMessage'
 import { InjectRedis } from '@nestjs-modules/ioredis'
@@ -20,6 +21,9 @@ import { QueuedMessage } from '@credo-ts/core'
 import { Server } from 'rpc-websockets'
 import Redis from 'ioredis'
 import { JsonRpcResponseSubscriber } from './interfaces/interfaces'
+import { FcmNotificationSender } from 'src/providers/firebase-config'
+import { QueueService } from 'src/providers/queue-service'
+import { ApnNotificationSender } from 'src/providers/apns-config'
 
 @Injectable()
 export class WebsocketService {
@@ -33,6 +37,8 @@ export class WebsocketService {
     @InjectRedis() private readonly redis: Redis,
     private configService: ConfigService,
     private readonly httpService: HttpService,
+    private readonly queueService: QueueService,
+    private readonly fcmNotificationSender: FcmNotificationSender,
   ) {
     this.logger = new Logger(WebsocketService.name)
     this.redisSubscriber = this.redis.duplicate()
@@ -176,7 +182,8 @@ export class WebsocketService {
 
         if (token && messageId) {
           this.logger.debug(`[addMessage] Push notification parameters token: ${token}; MessageId: ${messageId}`)
-          await this.sendPushNotification(token, messageId)
+          //await this.sendPushNotification(token, messageId)
+          await this.fcmSendNotificationService({ token, messageId })
         }
       }
       return { messageId }
@@ -823,6 +830,46 @@ export class WebsocketService {
         `[takeMessagesWithSize] Error retrieving messages for connectionId ${connectionId}: ${error.message}`,
       )
       return []
+    }
+  }
+
+  async fcmSendNotificationService(notificationPayload: SendNotificationDto) {
+    try {
+      this.logger.log('[sendNotification] Initilize endpoint')
+      const { token, messageId } = notificationPayload
+
+      if (this.queueService.isTokenInQueue(token)) {
+        this.logger.debug(`[sendNotification]  Token is already in the queue. Ignoring the request.`)
+        return { success: false, response: 'Token is already in the queue. Ignoring the request.' }
+      }
+
+      const response = await new Promise<any>((resolve, reject) => {
+        this.queueService.addToQueue(token, messageId).subscribe({
+          next: async () => {
+            try {
+              const sendNotification: any = await this.fcmNotificationSender.sendPushNotification(token, messageId)
+              this.logger.debug(
+                `[sendNotification] response send push notification: ${JSON.stringify(sendNotification)}`,
+              )
+              if (sendNotification.success) {
+                resolve(sendNotification)
+              } else {
+                reject(sendNotification)
+              }
+            } catch (error) {
+              reject({ success: false, message: 'Failed to send notification', error })
+            }
+          },
+          error: (err) => reject(err),
+        })
+      })
+      return { response }
+    } catch (error) {
+      this.logger.error(`Error sending notification: ${error.message}`, error.stack, 'NotificationController')
+      throw new HttpException(
+        { success: false, response: 'send notification error', error },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      )
     }
   }
 }
