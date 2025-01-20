@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator'
+import { IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator'
 
 export type EncryptedMessage = {
   protected: string
@@ -41,6 +41,15 @@ export class TakeFromQueueDto {
   recipientDid?: string
 }
 
+export class PushNotificationTokenDto {
+  @IsNotEmpty()
+  @IsString()
+  type?: string
+
+  @IsOptional()
+  @IsString()
+  token?: string
+}
 export class AddMessageDto {
   @IsNotEmpty()
   id: string
@@ -55,7 +64,8 @@ export class AddMessageDto {
   payload: EncryptedMessage
 
   @IsOptional()
-  token: string
+  @ValidateNested()
+  pushNotificationToken?: PushNotificationTokenDto
 }
 
 export class RemoveMessagesDto {
@@ -111,6 +121,7 @@ export class SendNotificationDto {
   @IsString({ message: 'MessageId must be a string' })
   messageId: string
 }
+
 export type SendNotificationResponseDto =
   | {
       success: boolean

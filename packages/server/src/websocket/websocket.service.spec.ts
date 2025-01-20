@@ -4,6 +4,9 @@ import { getModelToken } from '@nestjs/mongoose'
 import { HttpService } from '@nestjs/axios'
 import { ConfigService } from '@nestjs/config'
 import Redis from 'ioredis'
+import { FcmNotificationSender } from '../providers/FcmNotificationSender'
+import { ApnNotificationSender } from '../providers/ApnNotificationSender'
+import { PushNotificationQueueService } from '../providers/PushNotificationQueueService'
 
 describe('WebsocketService', () => {
   let service: WebsocketService
@@ -11,6 +14,9 @@ describe('WebsocketService', () => {
   let httpServiceMock: HttpService
   let configServiceMock: ConfigService
   let storeQueuedMessageMock: any
+  let fcmNotificationSender: FcmNotificationSender
+  let pushNotificationQueueService: PushNotificationQueueService
+  let apnNotificationSender: ApnNotificationSender
 
   beforeEach(async () => {
     // Mock Redis
@@ -56,15 +62,40 @@ describe('WebsocketService', () => {
         { provide: 'default_IORedisModuleConnectionToken', useValue: redisMock },
         { provide: HttpService, useValue: httpServiceMock },
         { provide: ConfigService, useValue: configServiceMock },
+        {
+          provide: FcmNotificationSender,
+          useValue: {
+            sendPushNotification: jest.fn(),
+          },
+        },
+        {
+          provide: ApnNotificationSender,
+          useValue: {
+            sendPushNotification: jest.fn(),
+          },
+        },
+        {
+          provide: PushNotificationQueueService,
+          useValue: {
+            isTokenInQueue: jest.fn(),
+            addToQueue: jest.fn().mockReturnValue({
+              subscribe: jest.fn(),
+            }),
+          },
+        },
       ],
     }).compile()
 
     service = module.get<WebsocketService>(WebsocketService)
+    pushNotificationQueueService = module.get<PushNotificationQueueService>(PushNotificationQueueService)
+    fcmNotificationSender = module.get<FcmNotificationSender>(FcmNotificationSender)
+    apnNotificationSender = module.get<ApnNotificationSender>(ApnNotificationSender)
   })
 
   afterEach(async () => {
     // Close Redis connections
     await redisMock.quit()
+    jest.clearAllMocks()
   })
 
   it('should be defined', () => {
@@ -75,7 +106,7 @@ describe('WebsocketService', () => {
     // Mock configuration for Redis
     jest.spyOn(redisMock, 'lrange').mockResolvedValue([
       JSON.stringify({
-        id: '1', // Usar 'id' en lugar de 'messageId'
+        id: '1',
         encryptedMessage: 'test-message-2',
         receivedAt: new Date().toISOString(),
       }),
@@ -84,7 +115,7 @@ describe('WebsocketService', () => {
     // Mock configuration for MongoDB
     storeQueuedMessageMock.exec.mockResolvedValue([
       {
-        id: '2', // MongoDB usa _id por defecto
+        id: '2',
         encryptedMessage: 'test-message-1',
         createdAt: new Date(),
       },
@@ -106,8 +137,8 @@ describe('WebsocketService', () => {
 
     // Verify the combined result from Redis and MongoDB
     expect(result).toHaveLength(2)
-    expect(result[0].encryptedMessage).toBe('test-message-1') // Verifica por 'id'
-    expect(result[1].encryptedMessage).toBe('test-message-2') // Verifica por 'id'
+    expect(result[0].encryptedMessage).toBe('test-message-1')
+    expect(result[1].encryptedMessage).toBe('test-message-2')
   })
 
   it('should takeFromQueue (Redis and MongoDB) with limit message', async () => {

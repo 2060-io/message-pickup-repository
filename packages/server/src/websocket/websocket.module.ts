@@ -7,7 +7,7 @@ import { StoreLiveSessionSchema, StoreLiveSession } from './schemas/StoreLiveSes
 import { MessagePersister } from './services/MessagePersister'
 import { HttpModule } from '@nestjs/axios'
 import { FcmNotificationSender } from '../providers/FcmNotificationSender'
-import { QueueService } from '../providers/PushNotificationQueueService'
+import { PushNotificationQueueService } from '../providers/PushNotificationQueueService'
 import { ApnNotificationSender } from '../providers/ApnNotificationSender'
 
 @Module({
@@ -18,18 +18,13 @@ import { ApnNotificationSender } from '../providers/ApnNotificationSender'
     ]),
     HttpModule,
   ],
-  providers: [WebsocketGateway, WebsocketService, MessagePersister, ...configNotificationModule()],
+  providers: [
+    WebsocketGateway,
+    WebsocketService,
+    MessagePersister,
+    FcmNotificationSender,
+    ApnNotificationSender,
+    PushNotificationQueueService,
+  ],
 })
 export class WebsocketModule {}
-
-function configNotificationModule(): any[] {
-  const provider = process.env.NOTIFICATION_PROVIDER || 'fcm'
-
-  if (provider === 'fcm') {
-    return [FcmNotificationSender, QueueService]
-  } else if (provider === 'apns') {
-    return [ApnNotificationSender]
-  } else {
-    throw new Error('Invalid notificationProvider value in appConfig. Expected "fcm" or "apns".')
-  }
-}

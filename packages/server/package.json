@@ -35,6 +35,7 @@
     "@nestjs/websockets": "^10.4.1",
     "axios": "^1.7.5",
     "class-validator": "^0.14.1",
+    "class-transformer": "^0.5.1",
     "ioredis": "^5.4.1",
     "mongodb": "^6.8.0",
     "mongodb-memory-server": "^10.0.0",
