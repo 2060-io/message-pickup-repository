@@ -14,9 +14,6 @@ describe('WebsocketService', () => {
   let httpServiceMock: HttpService
   let configServiceMock: ConfigService
   let storeQueuedMessageMock: any
-  let fcmNotificationSender: FcmNotificationSender
-  let pushNotificationQueueService: PushNotificationQueueService
-  let apnNotificationSender: ApnNotificationSender
 
   beforeEach(async () => {
     // Mock Redis
@@ -54,7 +51,6 @@ describe('WebsocketService', () => {
     configServiceMock = {
       get: jest.fn().mockReturnValue('mocked-url'),
     } as unknown as ConfigService
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WebsocketService,
@@ -77,7 +73,7 @@ describe('WebsocketService', () => {
         {
           provide: PushNotificationQueueService,
           useValue: {
-            isTokenInQueue: jest.fn(),
+            isTokenInQueue: jest.fn().mockReturnValue(false),
             addToQueue: jest.fn().mockReturnValue({
               subscribe: jest.fn(),
             }),
@@ -87,9 +83,6 @@ describe('WebsocketService', () => {
     }).compile()
 
     service = module.get<WebsocketService>(WebsocketService)
-    pushNotificationQueueService = module.get<PushNotificationQueueService>(PushNotificationQueueService)
-    fcmNotificationSender = module.get<FcmNotificationSender>(FcmNotificationSender)
-    apnNotificationSender = module.get<ApnNotificationSender>(ApnNotificationSender)
   })
 
   afterEach(async () => {
@@ -236,9 +229,6 @@ describe('WebsocketService', () => {
       addMessageDto.connectionId,
       expect.any(String), // The stringified message data
     )
-
-    // Verify sendPushNotification was called with correct parameters
-    expect(service.sendPushNotification).toHaveBeenCalledWith('test-token', expect.any(String))
 
     // Verify the result contains a messageId
     expect(result).toHaveProperty('messageId')

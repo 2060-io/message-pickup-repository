@@ -40,7 +40,7 @@ export class WebsocketService {
     private readonly httpService: HttpService,
     private readonly fcmNotificationSender: FcmNotificationSender | null,
     private readonly apnNotificationSender: ApnNotificationSender | null,
-    private readonly pushNotificationQueueService: PushNotificationQueueService,
+    private readonly pushNotificationQueueService: PushNotificationQueueService | null,
   ) {
     this.logger = new Logger(WebsocketService.name)
     this.redisSubscriber = this.redis.duplicate()
