@@ -11,6 +11,8 @@ import {
   ConnectionIdDto,
   AddLiveSessionDto,
   RemoveAllMessagesDto,
+  SendNotificationDto,
+  SendNotificationResponseDto,
 } from './dto/messagerepository-websocket.dto'
 import { StoreQueuedMessage } from './schemas/StoreQueuedMessage'
 import { InjectRedis } from '@nestjs-modules/ioredis'
@@ -20,6 +22,9 @@ import { QueuedMessage } from '@credo-ts/core'
 import { Server } from 'rpc-websockets'
 import Redis from 'ioredis'
 import { JsonRpcResponseSubscriber } from './interfaces/interfaces'
+import { FcmNotificationSender } from '../providers/FcmNotificationSender'
+import { PushNotificationQueueService } from '../providers/PushNotificationQueueService'
+import { ApnNotificationSender } from '../providers/ApnNotificationSender'
 
 @Injectable()
 export class WebsocketService {
@@ -33,6 +38,9 @@ export class WebsocketService {
     @InjectRedis() private readonly redis: Redis,
     private configService: ConfigService,
     private readonly httpService: HttpService,
+    private readonly fcmNotificationSender: FcmNotificationSender | null,
+    private readonly apnNotificationSender: ApnNotificationSender | null,
+    private readonly pushNotificationQueueService: PushNotificationQueueService | null,
   ) {
     this.logger = new Logger(WebsocketService.name)
     this.redisSubscriber = this.redis.duplicate()
@@ -129,7 +137,9 @@ export class WebsocketService {
    * @returns {Promise<{ messageId: string; receivedAt: Date } | undefined>} - A promise that resolves to the message ID and received timestamp or undefined if an error occurs.
    */
   async addMessage(dto: AddMessageDto): Promise<{ messageId: string } | undefined> {
-    const { connectionId, recipientDids, payload, token } = dto
+    const { connectionId, recipientDids, payload, pushNotificationToken } = dto
+    const type = pushNotificationToken?.type || null
+    const token = pushNotificationToken?.token || null
     let receivedAt: Date
     let messageId: string
 
@@ -176,7 +186,11 @@ export class WebsocketService {
 
         if (token && messageId) {
           this.logger.debug(`[addMessage] Push notification parameters token: ${token}; MessageId: ${messageId}`)
-          await this.sendPushNotification(token, messageId)
+          if (type === 'fcm') {
+            await this.fcmSendPushNotification({ token, messageId })
+          } else {
+            await this.apnSendNotification({ token, messageId })
+          }
         }
       }
       return { messageId }
@@ -823,6 +837,132 @@ export class WebsocketService {
         `[takeMessagesWithSize] Error retrieving messages for connectionId ${connectionId}: ${error.message}`,
       )
       return []
+    }
+  }
+
+  /**
+   * Handles sending a push notification using Firebase Cloud Messaging (FCM).
+   * Ensures no duplicate notifications are sent by utilizing a queue service
+   * for token management and logs the success or failure of the process.
+   *
+   * @param {SendNotificationDto} notificationPayload - The notification payload containing the token and message ID.
+   * @returns {Promise<void>} - This function does not return a value.
+   */
+  async fcmSendPushNotification(notificationPayload: SendNotificationDto): Promise<void> {
+    if (!this.fcmNotificationSender) {
+      this.logger.warn('[fcmSendPushNotification] FCM Notification Sender is not configured. Skipping notification.')
+      return
+    }
+    try {
+      this.logger.log('[fcmSendPushNotification] Starting push notification process')
+
+      const { token, messageId } = notificationPayload
+
+      // Check if the token is already in the queue to prevent duplicate notifications
+      if (this.pushNotificationQueueService.isTokenInQueue(token)) {
+        this.logger.debug('[fcmSendPushNotification] Token is already in the queue. Request ignored.')
+        return
+      }
+
+      // Add the token and message ID to the push notification queue
+      this.pushNotificationQueueService.addToQueue(token, messageId).subscribe({
+        next: async () => {
+          try {
+            this.logger.log(`[fcmSendPushNotification] Sending notification to token: ${token}`)
+
+            // Send the notification using the FCM Notification Sender
+            const sendNotification: SendNotificationResponseDto = await this.fcmNotificationSender.sendPushNotification(
+              token,
+              messageId,
+            )
+
+            // Log success or failure
+            if (sendNotification.success) {
+              this.logger.log(
+                `[fcmSendPushNotification] Notification sent successfully: ${JSON.stringify(sendNotification)}`,
+              )
+            } else {
+              this.logger.warn(`[fcmSendPushNotification] Notification failed: ${JSON.stringify(sendNotification)}`)
+            }
+          } catch (error) {
+            this.logger.error(
+              `[fcmSendPushNotification] Error during notification send: ${error.message}`,
+              error.stack,
+              'NotificationController',
+            )
+          }
+        },
+        error: (err) => {
+          this.logger.error(
+            `[fcmSendPushNotification] Error adding token to the queue: ${err.message}`,
+            err.stack,
+            'NotificationController',
+          )
+        },
+      })
+    } catch (error) {
+      this.logger.error(
+        `[fcmSendPushNotification] Unexpected error: ${error.message}`,
+        error.stack,
+        'NotificationController',
+      )
+    }
+  }
+
+  /**
+   * Handles the process of sending a push notification using Apple Push Notification service (APNs).
+   * Ensures no duplicate notifications are sent by utilizing a queue service for token management
+   * and logs the success or failure of the process.
+   *
+   * @param {SendNotificationDto} notificationPayload - The notification payload containing the device token and message ID.
+   * @returns {Promise<void>} - This function does not return a value, it logs success or failure instead.
+   */
+  async apnSendNotification(notificationPayload: SendNotificationDto): Promise<void> {
+    if (!this.apnNotificationSender) {
+      this.logger.warn('[apnSendNotification] APN Notification Sender is not configured. Skipping notification.')
+      return
+    }
+    try {
+      this.logger.log('[apnSendNotification] Initializing APN notification process')
+
+      const { token, messageId } = notificationPayload
+
+      // Check if the token is already in the queue to prevent duplicate notifications
+      if (this.pushNotificationQueueService.isTokenInQueue(token)) {
+        this.logger.debug('[apnSendNotification] Token is already in the queue. Request ignored.')
+        return
+      }
+
+      // Add the token and message ID to the push notification queue
+      this.pushNotificationQueueService.addToQueue(token, messageId).subscribe({
+        next: async () => {
+          try {
+            this.logger.log(`[apnSendNotification] Sending notification to token: ${token}`)
+
+            // Send the notification using the APN Notification Sender
+            const sendNotification: SendNotificationResponseDto = await this.apnNotificationSender.sendPushNotification(
+              token,
+              messageId,
+            )
+
+            // Log success or failure of the notification
+            if (sendNotification.success) {
+              this.logger.log(
+                `[apnSendNotification] Notification sent successfully: ${JSON.stringify(sendNotification)}`,
+              )
+            } else {
+              this.logger.warn(`[apnSendNotification] Notification failed: ${JSON.stringify(sendNotification)}`)
+            }
+          } catch (error) {
+            this.logger.error(`[apnSendNotification] Error during notification send: ${error.message}`, error.stack)
+          }
+        },
+        error: (err) => {
+          this.logger.error(`[apnSendNotification] Error adding token to the queue: ${err.message}`, err.stack)
+        },
+      })
+    } catch (error) {
+      this.logger.error(`[apnSendNotification] Unexpected error: ${error.message}`, error.stack)
     }
   }
 }

@@ -72,7 +72,7 @@ describe('WebSocket Connection (e2e)', () => {
         done()
       } catch (error) {
         client.close()
-        done.fail(`Failed to call ping: ${error.message}`)
+        done.fail(`Failed to call ping: ${error}`)
       }
     })
 

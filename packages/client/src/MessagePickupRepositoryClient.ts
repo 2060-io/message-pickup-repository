@@ -118,7 +118,7 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
    * const getConnectionInfo = async (connectionId: string) => {
    *   const connectionRecord = await agent.connections.findById(connectionId);
    *   return {
-   *     fcmNotificationToken: connectionRecord?.getTag('device_token') as string | undefined,
+   *     pushNotificationToken: { type: 'fcm', token: connectionRecord?.getTag('device_token') as string | undefined }
    *     maxReceiveBytes: config.messagePickupMaxReceiveBytes,
    *   };
    * };
@@ -227,8 +227,8 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
         ? await this.connectionInfoCallback(params.connectionId)
         : undefined
 
-      // Set the token and max bytes from the connection info, if available
-      params.token = connectionInfo?.fcmNotificationToken
+      // Set the pushNotificationToken and maxReceiveBytes from the connection info, if available
+      params.pushNotificationToken = connectionInfo?.pushNotificationToken
 
       // Call the 'addMessage' RPC method on the WebSocket server
       const result: unknown = await client.call('addMessage', params, 2000)

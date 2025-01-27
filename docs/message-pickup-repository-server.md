@@ -117,13 +117,33 @@ To resolve synchronization across multiple instances the Message Pickup Reposito
 
 ---
 
-### Push Notifications Handler
+## Push Notifications Handler
 
-In the **Message Pickup Repository**, the `sendPushNotification` function is responsible for sending push notifications to clients when they receive new messages. This mechanism ensures that clients are alerted even if they are not LiveSession into the server.
+In the **Message Pickup Repository**, the system ensures that clients are notified about new messages using **push notifications**. These notifications are sent using **Firebase Cloud Messaging (FCM)** for Android devices and **Apple Push Notification Service (APNs)** for iOS devices. This mechanism guarantees that clients receive alerts even if they are not in a live session with the server.
 
-#### When are Push Notifications Triggered?
+### When Are Push Notifications Triggered?
 
 Push notifications are triggered under the following conditions:
 
-1. **New Message Arrival**: Whenever a new message is added to the message queue for a specific `connectionId`, the server checks whether the client is online or not.
-2. **Client Offline**: If the client is not liveSession, a push notification is sent to notify the client of the new message via FCM Notification Sender API.
+1. **New Message Arrival**:  
+   Whenever a new message is added to the message queue for a specific `connectionId`, the server determines if the client is online or not.
+
+2. **Client Offline**:  
+   If the client is not in a live session, a push notification is sent to notify the client of the new message:
+   - **For Android devices**: The notification is sent via **FCM Notification Sender API**.
+   - **For iOS devices**: The notification is sent via **APNs Notification Sender API**.
+
+### How Does It Work?
+
+1. **Message Queuing**:
+
+   - When a new message is received, it is added to a queue in **Redis** for fast access and stored in **MongoDB** for persistence.
+   - If the client is offline, the system initiates the push notification process.
+
+2. **Notification Services**:
+
+   - **FCM**: The `FcmNotificationSender` class handles the sending of notifications to Android devices.
+   - **APNs**: The `ApnNotificationSender` class handles the sending of notifications to iOS devices.
+
+3. **Token Management**:
+   - The `PushNotificationQueueService` ensures that duplicate notifications are avoided by managing a queue of tokens.
