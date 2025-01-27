@@ -8,15 +8,21 @@ Service designed for the management and storage of messaging for the Message Pic
 
 ## Environment Variables
 
-| Variable               | Description                                                               | Default Value                                                     |
-| ---------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `APP_PORT`             | The port number on which the application will run.                        | `3500`                                                            |
-| `WS_PORT`              | The port number on which the WebSocket server runs.                       | `3100`                                                            |
-| `FCM_SERVICE_BASE_URL` | The base URL for the push notification service.                           | _Not set by default_                                              |
-| `MONGODB_URI`          | The MongoDB URI for connecting to the database.                           | `mongodb://user:password@localhost:27017/MessagePickupRepository` |
-| `REDIS_TYPE`           | Allows set redis type works `single` or `cluster`                         | `single`                                                          |
-| `REDIS_URL`            | The Redis database URL for connecting to the server.(only single mode)    | `redis://localhost:6379`                                          |
-| `THRESHOLD_TIMESTAMP`  | Allows set threshold time to execute message persist module on milisecond | `60000`                                                           |
+| Variable                 | Description                                                                                                                                                                               | Default Value                                                     |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `APP_PORT`               | The port number on which the application will run.                                                                                                                                        | `3500`                                                            |
+| `WS_PORT`                | The port number on which the WebSocket server runs.                                                                                                                                       | `3100`                                                            |
+| `MONGODB_URI`            | The MongoDB URI for connecting to the database.                                                                                                                                           | `mongodb://user:password@localhost:27017/MessagePickupRepository` |
+| `REDIS_TYPE`             | Allows set redis type works `single` or `cluster`                                                                                                                                         | `single`                                                          |
+| `REDIS_NODES`            | A comma-separated list of Redis nodes' `host:port` for cluster mode. Only required if `REDIS_TYPE` is set to `cluster`. Ignored in single mode.                                           | `redis-node1:6379,redis-node2:6379,redis-node3:6379`              |
+| `REDIS_NATMAP`           | The NAT mapping for Redis nodes in `externalAddress:host:port` format. Required for Redis cluster configurations where external IPs or ports are mapped to internal Redis node addresses. | `10.0.0.1:6379:redis-node1:6379,10.0.0.2:6379:redis-node2:6379`   |
+| `REDIS_URL`              | The Redis database URL for connecting to the server.(only single mode)                                                                                                                    | `redis://localhost:6379`                                          |
+| `THRESHOLD_TIMESTAMP`    | Allows set threshold time to execute message persist module on milisecond                                                                                                                 | `60000`                                                           |
+| `FIREBASE_CFG_FILE`      | The file path to the Firebase configuration JSON file.                                                                                                                                    | `./test/firebase-cfg.json`                                        |
+| `APNS_CFG_FILE`          | The file path to the APNs configuration JSON file.                                                                                                                                        | `./test/apns-cfg.json`                                            |
+| `APNS_PATH_KEY`          | The file path to the APNs authentication key file.                                                                                                                                        | `./test/apns-authkey.p8`                                          |
+| `APNS_TOPIC`             | The APNs topic, which is usually the app's bundle identifier.                                                                                                                             | `'default'`                                                       |
+| `NOTIFICATION_DATA_ONLY` | Indicates whether notifications should be sent as data-only.                                                                                                                              | `false`                                                           |
 
 ## Installation
 

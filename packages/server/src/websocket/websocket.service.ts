@@ -11,6 +11,8 @@ import {
   ConnectionIdDto,
   AddLiveSessionDto,
   RemoveAllMessagesDto,
+  SendNotificationDto,
+  SendNotificationResponseDto,
 } from './dto/messagerepository-websocket.dto'
 import { StoreQueuedMessage } from './schemas/StoreQueuedMessage'
 import { InjectRedis } from '@nestjs-modules/ioredis'
@@ -20,11 +22,13 @@ import { QueuedMessage } from '@credo-ts/core'
 import { Server } from 'rpc-websockets'
 import Redis from 'ioredis'
 import { JsonRpcResponseSubscriber } from './interfaces/interfaces'
+import { FcmNotificationSender } from '../providers/FcmNotificationSender'
+import { PushNotificationQueueService } from '../providers/PushNotificationQueueService'
+import { ApnNotificationSender } from '../providers/ApnNotificationSender'
 
 @Injectable()
 export class WebsocketService {
   private readonly logger: Logger
-  private readonly httpService: HttpService
   private readonly redisSubscriber: Redis
   private readonly redisPublisher: Redis
   private server: Server
@@ -33,10 +37,15 @@ export class WebsocketService {
     @InjectModel(StoreQueuedMessage.name) private queuedMessage: Model<StoreQueuedMessage>,
     @InjectRedis() private readonly redis: Redis,
     private configService: ConfigService,
+    private readonly httpService: HttpService,
+    private readonly fcmNotificationSender: FcmNotificationSender | null,
+    private readonly apnNotificationSender: ApnNotificationSender | null,
+    private readonly pushNotificationQueueService: PushNotificationQueueService | null,
   ) {
     this.logger = new Logger(WebsocketService.name)
     this.redisSubscriber = this.redis.duplicate()
     this.redisPublisher = this.redis.duplicate()
+    this.initializeRedisMessageListener()
   }
 
   async onModuleInit() {
@@ -54,72 +63,32 @@ export class WebsocketService {
 
   /**
    * Retrieves messages from both Redis and MongoDB based on the provided criteria.
-   * This method retrieves messages from Redis for the specified connection ID, as well as messages stored in MongoDB.
+   * Depending on the specified criteria, this method will retrieve messages either
+   * by a byte size limit or by a count limit, pulling messages from both Redis and MongoDB.
+   *
+   * If `limitBytes` is defined in the DTO, messages will be retrieved up to the specified byte limit
+   * using `takeMessagesWithByteCountLimit`. Otherwise, messages will be retrieved by a count limit
+   * using `takeMessagesWithMessageCountLimit`.
    *
    * @param {TakeFromQueueDto} dto - Data transfer object containing the query parameters.
    * @param {string} dto.connectionId - The unique identifier of the connection.
-   * @param {number} [dto.limit] - Optional limit on the number of messages to retrieve.
+   * @param {number} [dto.limit] - Optional limit on the number of messages to retrieve if `limitBytes` is not specified.
+   * @param {number} [dto.limitBytes] - Optional byte size limit for retrieving messages.
    * @param {boolean} [dto.deleteMessages] - Optional flag to determine if messages should be deleted after retrieval.
    * @param {string} [dto.recipientDid] - Optional recipient identifier for filtering messages.
+   * When set, retrieval is based on the cumulative byte size of messages rather than the count.
+   *
    * @returns {Promise<QueuedMessage[]>} - A promise that resolves to an array of queued messages.
+   * The array will contain messages retrieved either by byte size or by count, based on the criteria provided.
    */
   async takeFromQueue(dto: TakeFromQueueDto): Promise<QueuedMessage[]> {
-    const { connectionId, limit = 10, recipientDid } = dto
+    const { limitBytes } = dto
 
     this.logger.debug('[takeFromQueue] Method called with DTO:', dto)
 
-    try {
-      // Retrieve messages from Redis
-      const redisMessagesRaw = await this.redis.lrange(`connectionId:${connectionId}:queuemessages`, 0, limit - 1)
-      const redisMessages: QueuedMessage[] = redisMessagesRaw.map((message) => {
-        const parsedMessage = JSON.parse(message)
-
-        // Map Redis data to QueuedMessage type
-        return {
-          id: parsedMessage.messageId,
-          receivedAt: new Date(parsedMessage.receivedAt),
-          encryptedMessage: parsedMessage.encryptedMessage,
-        }
-      })
-
-      this.logger.debug(
-        `[takeFromQueue] Fetched ${redisMessages.length} messages from Redis for connectionId ${connectionId}`,
-      )
-
-      // Query MongoDB with the provided connectionId or recipientDid, and state 'pending'
-      const mongoMessages = await this.queuedMessage
-        .find({
-          $or: [{ connectionId }, { recipientKeys: recipientDid }],
-          state: 'pending',
-        })
-        .sort({ createdAt: 1 })
-        .limit(limit)
-        .select({ messageId: 1, encryptedMessage: 1, createdAt: 1 })
-        .lean()
-        .exec()
-
-      const mongoMappedMessages: QueuedMessage[] = mongoMessages.map((msg) => ({
-        id: msg.messageId,
-        receivedAt: msg.createdAt,
-        encryptedMessage: msg.encryptedMessage,
-      }))
-
-      this.logger.debug(
-        `[takeFromQueue] Fetched ${mongoMappedMessages.length} messages from MongoDB for connectionId ${connectionId}`,
-      )
-      // Combine messages from Redis and MongoDB
-      const combinedMessages: QueuedMessage[] = [...redisMessages, ...mongoMappedMessages]
-
-      this.logger.debug(`[takeFromQueue] combinedMessages for connectionId ${connectionId}: ${combinedMessages}`)
-
-      return combinedMessages
-    } catch (error) {
-      this.logger.error('[takeFromQueue] Error retrieving messages from Redis and MongoDB:', {
-        connectionId,
-        error: error.message,
-      })
-      return []
-    }
+    return limitBytes
+      ? await this.takeMessagesWithByteCountLimit(dto)
+      : await this.takeMessagesWithMessageCountLimit(dto)
   }
 
   /**
@@ -168,7 +137,9 @@ export class WebsocketService {
    * @returns {Promise<{ messageId: string; receivedAt: Date } | undefined>} - A promise that resolves to the message ID and received timestamp or undefined if an error occurs.
    */
   async addMessage(dto: AddMessageDto): Promise<{ messageId: string } | undefined> {
-    const { connectionId, recipientDids, payload, token } = dto
+    const { connectionId, recipientDids, payload, pushNotificationToken } = dto
+    const type = pushNotificationToken?.type || null
+    const token = pushNotificationToken?.token || null
     let receivedAt: Date
     let messageId: string
 
@@ -177,6 +148,11 @@ export class WebsocketService {
       messageId = new ObjectId().toString()
       receivedAt = new Date()
 
+      // Calculate the size in bytes of the encrypted message to add database
+      const encryptedMessageByteCount = Buffer.byteLength(JSON.stringify(payload), 'utf8')
+
+      this.logger.debug(`[addMessage] Size Encrypted Message ${encryptedMessageByteCount} `)
+
       // Create a message object to store in Redis
       const messageData = {
         messageId,
@@ -184,6 +160,7 @@ export class WebsocketService {
         recipientDids,
         encryptedMessage: payload,
         state: MessageState.pending,
+        encryptedMessageByteCount,
         receivedAt,
       }
 
@@ -209,7 +186,11 @@ export class WebsocketService {
 
         if (token && messageId) {
           this.logger.debug(`[addMessage] Push notification parameters token: ${token}; MessageId: ${messageId}`)
-          await this.sendPushNotification(token, messageId)
+          if (type === 'fcm') {
+            await this.fcmSendPushNotification({ token, messageId })
+          } else {
+            await this.apnSendNotification({ token, messageId })
+          }
         }
       }
       return { messageId }
@@ -379,11 +360,13 @@ export class WebsocketService {
     })
 
     this.logger.debug('[addLiveSession] socket_id:', { socket_id })
+
     try {
-      // Attempts to create a new live session record in the redis
+      // Use another Redis connection (not the subscriber) for general commands
       const sessionKey = `liveSession:${connectionId}`
       const response = await this.redis.hmset(sessionKey, {
         sessionId,
+        socket_id,
       })
 
       this.logger.debug('[addLiveSession] response:', { response })
@@ -391,37 +374,36 @@ export class WebsocketService {
       if (response === 'OK') {
         this.logger.log('[addLiveSession] LiveSession added successfully', { connectionId })
 
-        // Subscribes to the Redis channel for the connection ID
+        // Use the general Redis connection (not the subscriber) to check subscribed channels
+        const subscribedChannels = await this.redis.pubsub('CHANNELS')
+        const isSubscribed = subscribedChannels.includes(connectionId)
+
+        this.logger.debug(`[addLiveSession] subscribedChannels: ${subscribedChannels} - isSubscribed: ${isSubscribed}`)
+
+        if (isSubscribed) {
+          // If already subscribed, unsubscribe first using the subscriber Redis connection
+          this.logger.log(`[addLiveSession] Already subscribed to ${connectionId}, unsubscribing first...`)
+          await this.redisSubscriber.unsubscribe(connectionId, (err, count) => {
+            if (err) this.logger.error(err.message)
+            this.logger.log(`Unsubscribed ${count} from ${connectionId} channel.`)
+          })
+        }
+
+        this.logger.debug('[addLiveSession] try subscribe')
+
+        // Use redisSubscriber for subscriptions only
         await this.redisSubscriber.subscribe(connectionId, (err, count) => {
           if (err) this.logger.error(err.message)
           this.logger.log(`Subscribed ${count} to ${connectionId} channel.`)
         })
 
-        // Handles messages received on the subscribed Redis channel
-        this.redisSubscriber.on('message', (channel: string, message: string) => {
-          if (channel === connectionId) {
-            this.logger.log(`*** [redisSubscriber] Received message from ${channel}: ${message} **`)
-
-            const jsonRpcResponse: JsonRpcResponseSubscriber = {
-              jsonrpc: '2.0',
-              method: 'messageReceive',
-              params: {
-                connectionId,
-                message: JSON.parse(message),
-                id: dto.id,
-              },
-            }
-
-            this.sendMessageToClientById(socket_id, jsonRpcResponse)
-          }
-        })
         return true
       } else {
         this.logger.error('[addLiveSession] Failed to add LiveSession', { connectionId })
         return false
       }
     } catch (error) {
-      // Logs any errors encountered during the process and returns false
+      // Log any errors encountered during the process and return false
       this.logger.error('[addLiveSession] Error adding LiveSession to DB', {
         connectionId,
         error: error.message,
@@ -483,6 +465,19 @@ export class WebsocketService {
 
       // Retrieves the push notification URL from the configuration service
       const pushNotificationUrl = this.configService.get<string>('appConfig.pushNotificationUrl')
+
+      if (!pushNotificationUrl) {
+        this.logger?.error('[sendPushNotification] Push notification URL is not defined in appConfig')
+        return false
+      }
+
+      this.logger?.debug(`[sendPushNotification] pushNotificationUrl: ${pushNotificationUrl}`)
+      if (!token || !messageId) {
+        this.logger?.error('[sendPushNotification] Invalid token or messageId')
+        return false
+      }
+
+      this.logger?.debug(`[sendPushNotification] token: ${token} --- messageId: ${messageId}`)
 
       // Sends the push notification via HTTP POST request
       const response = await lastValueFrom(
@@ -574,7 +569,7 @@ export class WebsocketService {
    * @param {string} socket_id - The unique identifier of the WebSocket client to which the message will be sent.
    * @param {JsonRpcResponseSubscriber} message - The message to send, including:
    *   @property {string} jsonrpc - The JSON-RPC version, always '2.0'.
-   *   @property {string} method - The method being invoked, in this case, 'messageReceive'.
+   *   @property {string} method - The method being invoked, in this case, 'messagesReceived'.
    *   @property {Object} params - An object containing:
    *     @property {string} connectionId - The ID of the connection associated with the message.
    *     @property {QueuedMessage[]} message - An array of messages to be sent.
@@ -589,21 +584,24 @@ export class WebsocketService {
 
       // Iterate over all connected WebSocket clients
       this.server.wss.clients.forEach(async (client) => {
-        this.logger.debug(`[sendMessageToClientById] Find WebSocket client: ${JSON.stringify((client as any)._id)}}`)
+        this.logger.debug(`[sendMessageToClientById] Find WebSocket client: ${socket_id}`)
         // Check if the client's ID matches the provided socket_id and if the connection is open
 
         if ((client as any)._id === socket_id && client.readyState === 1) {
           clientFound = true
-          this.logger.debug(`[sendMessageToClientById] Sending message to WebSocket client: ${socket_id}`)
+          this.logger.debug(
+            `[sendMessageToClientById] Sending message to WebSocket client: ${JSON.stringify((client as any)._id)}}`,
+          )
 
           // Send the message to the client
           const sendMessage = client.send(JSON.stringify(message), (error) => {
-            this.logger.debug(`*** Error send: ${error}`)
+            if (error) this.logger.debug(`*** Error send: ${error} ***`)
           })
 
           this.logger.log(
-            `[sendMessageToClientById] Message sent successfully ${sendMessage} to client with ID: ${socket_id}`,
+            `[sendMessageToClientById] Message sent successfully ${sendMessage} to client with ID: ${JSON.stringify((client as any)._id)}}`,
           )
+          return
         }
       })
 
@@ -615,6 +613,356 @@ export class WebsocketService {
       // Log and throw an error if something goes wrong during the operation
       this.logger.error(`[sendMessageToClientById] Failed to send message to client with ID: ${socket_id}`, error.stack)
       throw new Error(`[sendMessageToClientById] Failed to send message: ${error.message}`)
+    }
+  }
+
+  /**
+   * Initializes the Redis message listener to handle incoming messages from subscribed channels.
+   * This listener will log and delegate message handling to the `handleMessage` method.
+   */
+  private initializeRedisMessageListener(): void {
+    this.logger.log('[initializeRedisMessageListener] Initializing Redis message listener')
+
+    try {
+      // Register the message listener for Redis channels
+      this.redisSubscriber.on('message', (channel: string, message: string) => {
+        this.logger.log(`*** [initializeRedisMessageListener] Received message from ${channel}: ${message} **`)
+
+        // Delegate message processing to the handleMessage method
+        this.handleMessage(channel, message)
+      })
+
+      this.logger.log('[initializeRedisMessageListener] Listener successfully registered')
+    } catch (error) {
+      // Log any errors that occur during listener initialization
+      this.logger.error('[initializeRedisMessageListener] Error initializing message listener', {
+        error: error.message,
+      })
+    }
+  }
+
+  /**
+   * Handles incoming messages from a Redis channel, retrieves the associated socket ID from Redis,
+   * and sends the message to the corresponding WebSocket client.
+   *
+   * @param {string} channel - The Redis channel (which corresponds to a connectionId) from which the message was received.
+   * @param {string} message - The message content received from the Redis channel.
+   * @returns {Promise<void>} - Returns nothing, but logs errors or actions.
+   */
+  private async handleMessage(channel: string, message: string): Promise<void> {
+    this.logger.log(`[handleMessage] Processing message for channel: ${channel}`)
+
+    try {
+      // Recover the session data (including socket_id) from Redis using the connectionId (channel)
+      const sessionKey = `liveSession:${channel}`
+      const sessionData = await this.redis.hgetall(sessionKey)
+
+      if (!sessionData) {
+        this.logger.error(`[handleMessage] No session data found for connectionId: ${channel}`)
+        return // Exit if no session data is found in Redis
+      }
+
+      const socket_id = sessionData.socket_id // Retrieve the socket_id associated with the connectionId
+      this.logger.debug(`[handleMessage] Recovered socket_id: ${socket_id} for connectionId: ${channel}`)
+
+      if (!socket_id) {
+        this.logger.error(`[handleMessage] No socket_id found for connectionId: ${channel}`)
+        return // Exit if socket_id is not found in the session data
+      }
+
+      // Parse and process the received message, and construct the JSON-RPC response
+      const jsonRpcResponse: JsonRpcResponseSubscriber = {
+        jsonrpc: '2.0',
+        method: 'messagesReceived',
+        params: {
+          connectionId: channel, // The channel is treated as the connectionId
+          messages: JSON.parse(message), // Parse the message to ensure it's valid JSON
+          id: '',
+        },
+      }
+
+      // Send the processed message to the WebSocket client using the recovered socket_id
+      await this.sendMessageToClientById(socket_id, jsonRpcResponse)
+      this.logger.log(`[handleMessage] Message sent to socket_id: ${socket_id}`)
+    } catch (error) {
+      // Log any errors encountered during the handling of the message
+      this.logger.error(`[handleMessage] Error processing message for channel: ${channel}`, {
+        error: error.message,
+      })
+    }
+  }
+
+  /**
+   * Retrieves messages from both Redis and MongoDB up to a specified message count limit.
+   *
+   * @param {TakeFromQueueDto} dto - Data transfer object containing query parameters.
+   * @returns {Promise<QueuedMessage[]>} - A promise that resolves to an array of queued messages.
+   */
+  private async takeMessagesWithMessageCountLimit(dto: TakeFromQueueDto): Promise<QueuedMessage[]> {
+    const { connectionId, limit, recipientDid } = dto
+
+    this.logger.debug('[takeMessagesWithLimit] Method called with DTO:', dto)
+
+    try {
+      // Query MongoDB with the provided connectionId or recipientDid, and state 'pending'
+      const mongoMessages = await this.queuedMessage
+        .find({
+          $or: [{ connectionId }, { recipientKeys: recipientDid }],
+          state: 'pending',
+        })
+        .sort({ createdAt: 1 })
+        .limit(limit)
+        .select({ messageId: 1, encryptedMessage: 1, createdAt: 1 })
+        .lean()
+        .exec()
+
+      const mongoMappedMessages: QueuedMessage[] = mongoMessages.map((msg) => ({
+        id: msg.messageId,
+        receivedAt: msg.createdAt,
+        encryptedMessage: msg.encryptedMessage,
+      }))
+
+      this.logger.debug(
+        `[takeMessagesWithLimit] Fetched ${mongoMappedMessages.length} messages from MongoDB for connectionId ${connectionId}`,
+      )
+
+      // Retrieve messages from Redis
+      const redisMessagesRaw = await this.redis.lrange(`connectionId:${connectionId}:queuemessages`, 0, limit - 1)
+      const redisMessages: QueuedMessage[] = redisMessagesRaw.map((message) => {
+        const parsedMessage = JSON.parse(message)
+
+        // Map Redis data to QueuedMessage type
+        return {
+          id: parsedMessage.messageId,
+          receivedAt: new Date(parsedMessage.receivedAt),
+          encryptedMessage: parsedMessage.encryptedMessage,
+        }
+      })
+
+      this.logger.debug(
+        `[takeMessagesWithLimit] Fetched ${redisMessages.length} messages from Redis for connectionId ${connectionId}`,
+      )
+      // Combine messages from Redis and MongoDB
+      const combinedMessages: QueuedMessage[] = [...mongoMappedMessages, ...redisMessages]
+
+      this.logger.debug(
+        `[takeMessagesWithLimit] combinedMessages for connectionId ${connectionId}: ${combinedMessages}`,
+      )
+
+      return combinedMessages
+    } catch (error) {
+      this.logger.error('[takeMessagesWithLimit] Error retrieving messages from Redis and MongoDB:', {
+        connectionId,
+        error: error.message,
+      })
+      return []
+    }
+  }
+
+  /**
+   * Retrieves messages from both Redis and MongoDB up to a specified total size in bytes.
+   *
+   * @param {TakeFromQueueDto} dto - Data transfer object containing query parameters.
+   * @returns {Promise<QueuedMessage[]>} - A promise that resolves to an array of queued messages.
+   */
+  private async takeMessagesWithByteCountLimit(dto: TakeFromQueueDto): Promise<QueuedMessage[]> {
+    const { connectionId, recipientDid, limitBytes } = dto
+    const maxMessageSizeBytes = limitBytes
+    let currentSize = 0
+    const combinedMessages: QueuedMessage[] = []
+
+    try {
+      // Step 1: Retrieve messages from MongoDB with size limit
+      const mongoMessages = await this.queuedMessage
+        .find({
+          $or: [{ connectionId }, { recipientKeys: recipientDid }],
+          state: 'pending',
+        })
+        .sort({ createdAt: 1 })
+        .select({ messageId: 1, encryptedMessage: 1, createdAt: 1, encryptedMessageByteCount: 1 })
+        .lean()
+        .exec()
+
+      for (const msg of mongoMessages) {
+        const messageSize =
+          msg.encryptedMessageByteCount || Buffer.byteLength(JSON.stringify(msg.encryptedMessage), 'utf8')
+
+        if (currentSize + messageSize > maxMessageSizeBytes) break
+
+        combinedMessages.push({
+          id: msg.messageId,
+          receivedAt: msg.createdAt,
+          encryptedMessage: msg.encryptedMessage,
+        })
+        currentSize += messageSize
+      }
+
+      // Skip Redis if size limit reached
+      if (currentSize >= maxMessageSizeBytes) {
+        this.logger.debug(
+          `[takeMessagesWithSize] Size limit reached with MongoDB messages for connectionId ${connectionId}`,
+        )
+        return combinedMessages
+      }
+
+      // Step 2: Retrieve messages from Redis with size limit
+      const redisMessagesRaw = await this.redis.lrange(`connectionId:${connectionId}:queuemessages`, 0, -1)
+
+      for (const message of redisMessagesRaw) {
+        const parsedMessage = JSON.parse(message)
+        const messageSize =
+          parsedMessage.sizeInBytes || Buffer.byteLength(JSON.stringify(parsedMessage.encryptedMessage), 'utf8')
+
+        if (currentSize + messageSize > maxMessageSizeBytes) break
+
+        combinedMessages.push({
+          id: parsedMessage.messageId,
+          receivedAt: new Date(parsedMessage.receivedAt),
+          encryptedMessage: parsedMessage.encryptedMessage,
+        })
+        currentSize += messageSize
+      }
+
+      this.logger.debug(
+        `[takeMessagesWithSize] Fetched ${combinedMessages.length} total messages for connectionId ${connectionId}`,
+      )
+
+      this.logger.debug(
+        `[takeMessagesWithSize] Total message size to be sent for connectionId ${connectionId}: ${currentSize} bytes`,
+      )
+
+      return combinedMessages
+    } catch (error) {
+      this.logger.error(
+        `[takeMessagesWithSize] Error retrieving messages for connectionId ${connectionId}: ${error.message}`,
+      )
+      return []
+    }
+  }
+
+  /**
+   * Handles sending a push notification using Firebase Cloud Messaging (FCM).
+   * Ensures no duplicate notifications are sent by utilizing a queue service
+   * for token management and logs the success or failure of the process.
+   *
+   * @param {SendNotificationDto} notificationPayload - The notification payload containing the token and message ID.
+   * @returns {Promise<void>} - This function does not return a value.
+   */
+  async fcmSendPushNotification(notificationPayload: SendNotificationDto): Promise<void> {
+    if (!this.fcmNotificationSender) {
+      this.logger.warn('[fcmSendPushNotification] FCM Notification Sender is not configured. Skipping notification.')
+      return
+    }
+    try {
+      this.logger.log('[fcmSendPushNotification] Starting push notification process')
+
+      const { token, messageId } = notificationPayload
+
+      // Check if the token is already in the queue to prevent duplicate notifications
+      if (this.pushNotificationQueueService.isTokenInQueue(token)) {
+        this.logger.debug('[fcmSendPushNotification] Token is already in the queue. Request ignored.')
+        return
+      }
+
+      // Add the token and message ID to the push notification queue
+      this.pushNotificationQueueService.addToQueue(token, messageId).subscribe({
+        next: async () => {
+          try {
+            this.logger.log(`[fcmSendPushNotification] Sending notification to token: ${token}`)
+
+            // Send the notification using the FCM Notification Sender
+            const sendNotification: SendNotificationResponseDto = await this.fcmNotificationSender.sendPushNotification(
+              token,
+              messageId,
+            )
+
+            // Log success or failure
+            if (sendNotification.success) {
+              this.logger.log(
+                `[fcmSendPushNotification] Notification sent successfully: ${JSON.stringify(sendNotification)}`,
+              )
+            } else {
+              this.logger.warn(`[fcmSendPushNotification] Notification failed: ${JSON.stringify(sendNotification)}`)
+            }
+          } catch (error) {
+            this.logger.error(
+              `[fcmSendPushNotification] Error during notification send: ${error.message}`,
+              error.stack,
+              'NotificationController',
+            )
+          }
+        },
+        error: (err) => {
+          this.logger.error(
+            `[fcmSendPushNotification] Error adding token to the queue: ${err.message}`,
+            err.stack,
+            'NotificationController',
+          )
+        },
+      })
+    } catch (error) {
+      this.logger.error(
+        `[fcmSendPushNotification] Unexpected error: ${error.message}`,
+        error.stack,
+        'NotificationController',
+      )
+    }
+  }
+
+  /**
+   * Handles the process of sending a push notification using Apple Push Notification service (APNs).
+   * Ensures no duplicate notifications are sent by utilizing a queue service for token management
+   * and logs the success or failure of the process.
+   *
+   * @param {SendNotificationDto} notificationPayload - The notification payload containing the device token and message ID.
+   * @returns {Promise<void>} - This function does not return a value, it logs success or failure instead.
+   */
+  async apnSendNotification(notificationPayload: SendNotificationDto): Promise<void> {
+    if (!this.apnNotificationSender) {
+      this.logger.warn('[apnSendNotification] APN Notification Sender is not configured. Skipping notification.')
+      return
+    }
+    try {
+      this.logger.log('[apnSendNotification] Initializing APN notification process')
+
+      const { token, messageId } = notificationPayload
+
+      // Check if the token is already in the queue to prevent duplicate notifications
+      if (this.pushNotificationQueueService.isTokenInQueue(token)) {
+        this.logger.debug('[apnSendNotification] Token is already in the queue. Request ignored.')
+        return
+      }
+
+      // Add the token and message ID to the push notification queue
+      this.pushNotificationQueueService.addToQueue(token, messageId).subscribe({
+        next: async () => {
+          try {
+            this.logger.log(`[apnSendNotification] Sending notification to token: ${token}`)
+
+            // Send the notification using the APN Notification Sender
+            const sendNotification: SendNotificationResponseDto = await this.apnNotificationSender.sendPushNotification(
+              token,
+              messageId,
+            )
+
+            // Log success or failure of the notification
+            if (sendNotification.success) {
+              this.logger.log(
+                `[apnSendNotification] Notification sent successfully: ${JSON.stringify(sendNotification)}`,
+              )
+            } else {
+              this.logger.warn(`[apnSendNotification] Notification failed: ${JSON.stringify(sendNotification)}`)
+            }
+          } catch (error) {
+            this.logger.error(`[apnSendNotification] Error during notification send: ${error.message}`, error.stack)
+          }
+        },
+        error: (err) => {
+          this.logger.error(`[apnSendNotification] Error adding token to the queue: ${err.message}`, err.stack)
+        },
+      })
+    } catch (error) {
+      this.logger.error(`[apnSendNotification] Unexpected error: ${error.message}`, error.stack)
     }
   }
 }

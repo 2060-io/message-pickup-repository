@@ -32,6 +32,13 @@ export class StoreQueuedMessage extends Document {
   encryptedMessage: EncryptedMessage
 
   /**
+   * The size Encrypted Message store in collection
+   * @type {number}
+   */
+  @Prop()
+  encryptedMessageByteCount?: number
+
+  /**
    * The recipient keys (DIDs or other identifiers) associated with the message.
    * @type {string[]}
    */
@@ -44,6 +51,7 @@ export class StoreQueuedMessage extends Document {
    */
   @Prop()
   state?: string
+
   /**
    * The timestamp when the message was created.
    * Mongoose automatically creates this field when `timestamps: true` is set in the schema.

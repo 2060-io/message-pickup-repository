@@ -9,7 +9,7 @@ The `MessagePickupRepositoryClient` is a client library designed to interact wit
 1. [Installation](#installation)
 2. [Available Methods](#available-methods)
    - [connect()](#connect)
-   - [messageReceived()](#messageReceived)
+   - [messagesReceived()](#messagesReceived)
    - [takeFromQueue()](#takeFromQueue)
    - [getAvailableMessageCount()](#getAvailableMessageCount)
    - [addMessage()](#addMessage)
@@ -40,9 +40,9 @@ Establishes a WebSocket connection to the server.
 
 ---
 
-### `messageReceived(callback)`
+### `messagesReceived(callback)`
 
-Registers a callback to handle `messageReceive` events from the WebSocket server. This method will be primarily used to receive new messages that are published by the server.
+Registers a callback to handle `messagesReceived` events from the WebSocket server. This method will be primarily used to receive new messages that are published by the server.
 
 - **Parameters**:
 
@@ -51,6 +51,28 @@ Registers a callback to handle `messageReceive` events from the WebSocket server
     - `message: QueuedMessage[]`: Array of queued messages.
 
 - **Returns**: `void`
+
+---
+
+### `setConnectionInfo(callback)`
+
+Registers a callback function to retrieve connection-specific information based on a given `connectionId`. This callback provides the `ConnectionInfo` object, which contains details such as the push notification token and maximum bytes allowed for receiving messages. This function is useful for dynamically fetching connection-related information whenever it is required by the client.
+
+- **Parameters**:
+
+  - `callback`: A function that takes a `connectionId` (string) and returns a `Promise` resolving to a `ConnectionInfo` object or `undefined` if no information is available for the given `connectionId`.
+    - `connectionId` (string): The ID of the connection for which to retrieve information.
+
+- **Returns**: `Promise<ConnectionInfo | undefined>`:
+
+  The resolved connection-specific information. This object includes:
+
+  - `pushNotificationToken` (optional, object): Contains details about the push notification token for the connection.
+
+    - `type` (string): Specifies the notification type, e.g., `fcm` for Firebase Cloud Messaging or `apn` for Apple Push Notification Service ().
+    - `token` (optional, string): The actual notification token for the device.
+
+  - `maxReceiveBytes` (optional, number): The maximum byte size allowed for messages received on this connection.
 
 ---
 
@@ -63,6 +85,7 @@ Retrieves messages from the queue.
   - `connectionId: string`: ID of the connection.
   - `recipientDid?: string`: Optional DID of the recipient.
   - `limit?: number`: Optional limit on the number of messages.
+  - `limitBytes?: number`: Optional byte size limit for retrieving messages
   - `deleteMessages?: boolean`: Whether to delete the messages after retrieval.
 
 - **Returns**: `Promise<QueuedMessage[]>`
@@ -178,7 +201,7 @@ Disconnects from the WebSocket server.
 Here is a simple usage example:
 
 ```typescript
-import { MessagePickupRepositoryClient } from './MessagePickupRepositoryClient'
+import { MessagePickupRepositoryClient } from '@2060.io/message-pickup-repository-client'
 
 async function runClient() {
   const client = new MessagePickupRepositoryClient('ws://localhost:3500')
@@ -189,7 +212,7 @@ async function runClient() {
     console.log('Connected to the WebSocket server.')
 
     // Register message receive callback
-    client.messageReceived((data) => {
+    client.messagesReceived((data) => {
       console.log('Received message:', data)
     })
 

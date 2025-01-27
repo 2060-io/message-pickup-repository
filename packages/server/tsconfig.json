@@ -6,7 +6,7 @@
   },
   "compilerOptions": {
     "baseUrl": ".",
-    "types": ["node", "jest"],
+    "types": ["node", "jest"]
   },
   "exclude": ["node_modules", "dist"]
 }

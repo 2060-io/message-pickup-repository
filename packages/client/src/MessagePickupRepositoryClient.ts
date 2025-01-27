@@ -4,7 +4,10 @@ import {
   RemoveAllMessagesOptions,
   ConnectionIdOptions,
   AddLiveSessionOptions,
-  MessageReceivedCallbackParams,
+  MessagesReceivedCallbackParams,
+  ExtendedTakeFromQueueOptions,
+  ExtendedAddMessageOptions,
+  ConnectionInfo,
 } from './interfaces'
 import {
   AddMessageOptions,
@@ -12,7 +15,6 @@ import {
   MessagePickupRepository,
   QueuedMessage,
   RemoveMessagesOptions,
-  TakeFromQueueOptions,
 } from '@credo-ts/core'
 
 log.setLevel('info')
@@ -20,9 +22,13 @@ log.setLevel('info')
 export class MessagePickupRepositoryClient implements MessagePickupRepository {
   private client?: Client
   private readonly logger = log
-  private messageReceivedCallback: ((data: MessageReceivedCallbackParams) => void) | null = null
+  private messagesReceivedCallback: ((data: MessagesReceivedCallbackParams) => void) | null = null
+  private connectionInfoCallback?: (connectionId: string) => Promise<ConnectionInfo | undefined>
+  private readonly url: string
 
-  constructor(private readonly url: string) {}
+  constructor(options: { url: string }) {
+    this.url = options.url
+  }
 
   /**
    * Connect to the WebSocket server.
@@ -37,11 +43,11 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
       client.on('open', () => {
         this.logger.log(`Connected to WebSocket server ${client}`)
 
-        client.subscribe('messageReceive')
+        client.subscribe('messagesReceived')
 
-        client.addListener('messageReceive', (data) => {
-          if (this.messageReceivedCallback) {
-            this.messageReceivedCallback(data as MessageReceivedCallbackParams)
+        client.addListener('messagesReceived', (data) => {
+          if (this.messagesReceivedCallback) {
+            this.messagesReceivedCallback(data as MessagesReceivedCallbackParams)
           } else {
             this.logger.log('Received message event, but no callback is registered:', data)
           }
@@ -57,6 +63,14 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
     })
   }
 
+  /**
+   * Checks if the WebSocket client is initialized and returns it.
+   * If the client is not initialized, throws an error instructing to call `connect()` first.
+   *
+   * @private
+   * @throws {Error} Will throw an error if the client is not initialized.
+   * @returns {Client} The initialized WebSocket client instance.
+   */
   private checkClient(): Client {
     if (!this.client) {
       throw new Error('Client is not initialized. Call connect() first.')
@@ -65,46 +79,89 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   }
 
   /**
-   * Register a callback function for the 'messageReceive' event.
-   * This function allows you to set up a listener for the 'messageReceive' event,
+   * Register a callback function for the 'messagesReceived' event.
+   * This function allows you to set up a listener for the 'messagesReceived' event,
    * which is triggered when a message is received via JSON-RPC.
    *
-   * @param callback - The callback function to be invoked when 'messageReceive' is triggered.
+   * @param callback - The callback function to be invoked when 'messagesReceived' is triggered.
    * The callback receives a `data` parameter of type `JsonRpcParamsMessage`, containing:
    *
-   * @param {MessageReceivedCallbackParams} data - The data received via the 'messageReceive' event.
+   * @param {MessagesReceivedCallbackParams} data - The data received via the 'messagesReceived' event.
    *
    * @param {string} data.connectionId - The ID of the connection associated with the message.
    * @param {QueuedMessage[]} data.message - Array of queued messages received.
    * @param {string} [data.id] - (Optional) The identifier for the JSON-RPC message.
    *
    * @example
-   * messageReceived((data: MessageReceivedCallbackParams) => {
+   * messagesReceived((data: MessageReceivedCallbackParams) => {
    *   const { connectionId, message } = data
    *   console.log('ConnectionId:', data.connectionId);
    *   console.log('Message:', message[0].id)
    * });
    */
-  messageReceived(callback: (data: MessageReceivedCallbackParams) => void): void {
-    this.messageReceivedCallback = callback
+  messagesReceived(callback: (data: MessagesReceivedCallbackParams) => void): void {
+    this.messagesReceivedCallback = callback
   }
 
   /**
-   * Call the 'takeFromQueue' RPC method.
-   * This method sends a request to the WebSocket server to take messages from the queue.
-   * It expects the response to be an array of `QueuedMessage` objects.
+   * Sets the callback function to retrieve connection-specific information.
+   * This callback provides the `ConnectionInfo` object, containing details like
+   * the FCM notification token and max receive bytes, based on the given `connectionId`.
    *
-   * @param {TakeFromQueueOptions} params - The parameters to pass to the 'takeFromQueue' method, including:
+   * @param {function} callback - A function that takes a `connectionId` as a parameter and returns
+   * a `Promise` that resolves to a `ConnectionInfo` object or `undefined` if no information is available.
+   *
+   * @example
+   * // Example of setting the callback to retrieve connection-specific information
+   * const client = new MessagePickupRepositoryClient({ url: 'wss://example.com' });
+   *
+   * const getConnectionInfo = async (connectionId: string) => {
+   *   const connectionRecord = await agent.connections.findById(connectionId);
+   *   return {
+   *     pushNotificationToken: { type: 'fcm', token: connectionRecord?.getTag('device_token') as string | undefined }
+   *     maxReceiveBytes: config.messagePickupMaxReceiveBytes,
+   *   };
+   * };
+   *
+   * client.setConnectionInfo(getConnectionInfo);
+   */
+  setConnectionInfo(callback: (connectionId: string) => Promise<ConnectionInfo | undefined>): void {
+    this.connectionInfoCallback = callback
+  }
+
+  /**
+   * Calls the 'takeFromQueue' RPC method on the WebSocket server.
+   * This method sends a request to retrieve messages from the queue for the specified connection.
+   * It can retrieve messages up to a specified byte limit (`limitBytes`) or by a count limit (`limit`).
+   * The response is expected to be an array of `QueuedMessage` objects.
+   *
+   * @param {ExtendedTakeFromQueueOptions} params - The parameters to pass to the 'takeFromQueue' method, including:
    *   @property {string} connectionId - The ID of the connection from which to take messages.
    *   @property {string} [recipientDid] - Optional DID of the recipient to filter messages by.
-   *   @property {number} [limit] - Optional maximum number of messages to take from the queue.
+   *   @property {number} [limit] - Optional maximum number of messages to take from the queue. Ignored if `limitBytes` is set.
+   *   @property {number} [limitBytes] - Optional maximum cumulative byte size of messages to retrieve.
    *   @property {boolean} [deleteMessages] - Optional flag indicating whether to delete the messages after retrieving them.
-   * @returns {Promise<QueuedMessage[]>} - The result from the WebSocket server, expected to be an array of `QueuedMessage`.
-   * @throws Will throw an error if the result is not an array or if there's any issue with the WebSocket call.
+   *   If provided, limits the retrieval by the total byte size of messages rather than by count.
+   *
+   * @returns {Promise<QueuedMessage[]>} - A promise that resolves to an array of `QueuedMessage` objects from the WebSocket server.
+   * @throws {Error} Will throw an error if the result is not an array of `QueuedMessage` objects,
+   * or if any issue occurs with the WebSocket call.
    */
-  async takeFromQueue(params: TakeFromQueueOptions): Promise<QueuedMessage[]> {
+  async takeFromQueue(params: ExtendedTakeFromQueueOptions): Promise<QueuedMessage[]> {
     try {
       const client = this.checkClient()
+
+      const connectionInfo = this.connectionInfoCallback
+        ? await this.connectionInfoCallback(params.connectionId)
+        : undefined
+
+      const maxReceiveBytes = connectionInfo?.maxReceiveBytes
+
+      // Add limitBytes to params if maxReceiveBytes is set
+      if (maxReceiveBytes) {
+        params = { ...params, limitBytes: maxReceiveBytes }
+      }
+
       // Call the RPC method and store the result as 'unknown' type initially
       const result: unknown = await client.call('takeFromQueue', params, 2000)
 
@@ -148,33 +205,43 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   }
 
   /**
-   * Call the 'addMessage' RPC method.
-   * This method sends a request to the WebSocket server to add a message to the queue.
-   * It expects the response to be a string or null.
+   * Calls the 'addMessage' RPC method.
+   * This function sends a request to the WebSocket server to add a message to the queue.
+   * It retrieves the device token (if available) and includes it in the parameters.
+   * Expects the response from the server to be a JSON string or an empty string if null.
    *
-   * @param {AddMessageOptions} params - The parameters to pass to the 'addMessage' method, including:
+   * @param {ExtendedAddMessageOptions} params - Parameters for the 'addMessage' method, including:
    *   @property {string} connectionId - The ID of the connection to which the message will be added.
-   *   @property {string[]} recipientDids - An array of DIDs of the recipients for whom the message is intended.
+   *   @property {string[]} recipientDids - Array of DIDs for the intended recipients of the message.
    *   @property {EncryptedMessage} payload - The encrypted message content to be queued.
-   * @returns {Promise<string|null>} - The result from the WebSocket server, expected to be a string or null.
-   * @throws Will throw an error if the result is not an object, null, or if there's any issue with the WebSocket call.
+   *   @property {string} [token] - (Optional) A token associated with the device; will be populated if available.
+   * @returns {Promise<string>} - The server response, expected as a JSON string or an empty string if the response is null.
+   * @throws {Error} Will throw an error if the result is neither an object nor null, or if any issue occurs during the WebSocket call.
    */
-  async addMessage(params: AddMessageOptions): Promise<string> {
+  async addMessage(params: ExtendedAddMessageOptions): Promise<string> {
     try {
       const client = this.checkClient()
-      // Call the RPC method and store the result as 'unknown' type initially
+
+      // Retrieve connection information using the callback, if set
+      const connectionInfo = this.connectionInfoCallback
+        ? await this.connectionInfoCallback(params.connectionId)
+        : undefined
+
+      // Set the pushNotificationToken and maxReceiveBytes from the connection info, if available
+      params.pushNotificationToken = connectionInfo?.pushNotificationToken
+
+      // Call the 'addMessage' RPC method on the WebSocket server
       const result: unknown = await client.call('addMessage', params, 2000)
 
+      // Log the result and handle the response format
       this.logger.debug(`**** result: ${JSON.stringify(result, null, 2)} ***`)
 
-      // Check if the result is a string and cast it
-      if (result && typeof result === 'object') {
-        return JSON.stringify(result)
-      } else if (result === null) {
-        return ''
-      } else {
-        throw new Error('Unexpected result: Expected an object or null')
-      }
+      // Return JSON stringified result if it's an object, or an empty string if result is null
+      if (result === null) return ''
+      if (typeof result === 'object') return JSON.stringify(result)
+
+      // If result is neither an object nor null, throw an error
+      throw new Error('Unexpected result: Expected an object or null')
     } catch (error) {
       // Log the error and rethrow it for further handling
       this.logger.error('Error calling addMessage:', error)

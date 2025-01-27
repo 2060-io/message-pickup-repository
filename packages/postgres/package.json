@@ -1,7 +1,7 @@
 {
-  "name": "@2060.io/message-pickup-repository-client",
-  "main": "build/index",
-  "types": "build/index",
+  "name": "@2060.io/credo-ts-message-pickup-repository-pg",
+  "main": "build/src/index.js",
+  "types": "build/src/index.d.ts",
   "version": "0.0.7",
   "files": [
     "build"
@@ -9,13 +9,13 @@
   "publishConfig": {
     "access": "public"
   },
-  "description": "Message Pickup Repository client module",
+  "description": "Message Pickup Repository Postgres module",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/2060-io/message-pickup-repository/tree/main/packages/client",
+  "homepage": "https://github.com/2060-io/message-pickup-repository/tree/main/packages/postgres",
   "repository": {
     "type": "git",
     "url": "https://github.com/2060-io/message-pickup-repository",
-    "directory": "packages/client"
+    "directory": "packages/postgres"
   },
   "scripts": {
     "build": "yarn run clean && yarn run compile",
@@ -25,13 +25,15 @@
     "test": "jest"
   },
   "dependencies": {
-    "rpc-websockets": "^7.11.2",
-    "@credo-ts/core": "^0.5.10",
+    "@credo-ts/core": "^0.5.11",
     "loglevel": "^1.8.0",
+    "pg": "^8.11.3",
+    "pg-pubsub": "^0.8.1",
     "typescript": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^16.0.0",
+    "@types/pg": "^8.11.10",
     "jest": "^27.0.0",
     "ts-jest": "^27.0.0",
     "ts-loader": "^9.0.0",
@@ -39,6 +41,6 @@
     "webpack-cli": "^4.0.0"
   },
   "peerDependencies": {
-    "@credo-ts/core": "^0.5.10"
+    "@credo-ts/core": "^0.5.11"
   }
 }
