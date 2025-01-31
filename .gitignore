@@ -40,4 +40,4 @@ lerna-debug.log*
 
 #files
 package-lock.json
-packages/server/yarn.lock
+apps/server/yarn.lock

@@ -17,7 +17,7 @@
     "format": "yarn prettier --write",
     "check-format": "yarn prettier --list-different",
     "test": "yarn workspaces run test --passWithNoTests",
-    "test:e2e": "jest --config ./packages/server/test/jest-e2e.json",
+    "test:e2e": "jest --config ./apps/server/test/jest-e2e.json",
     "lint": "eslint --ignore-path .gitignore --ignore-pattern '**/esm/' .",
     "validate": "yarn lint && yarn check-types && yarn check-format"
   },
