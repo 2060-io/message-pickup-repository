@@ -9,7 +9,7 @@
     "packages/client": {
       "release-type": "node"
     },
-    "packages/server": {
+    "apps/server": {
       "release-type": "node"
     },
     "packages/postgres": {

@@ -32,7 +32,6 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
   private messagesCollection?: Pool
   private agent?: Agent
   private pubSubInstance?: PGPubsub
-  private dbListener?: boolean
   private instanceName?: string
   private postgresUser: string
   private postgresPassword: string

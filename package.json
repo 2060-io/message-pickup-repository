@@ -2,7 +2,7 @@
   "name": "message-pickup-repository",
   "private": true,
   "license": "Apache-2.0",
-  "description": "DIDComm Message Pickup Repository",
+  "description": "Message Pickup Repository implementations for Credo agents",
   "workspaces": [
     "packages/*"
   ],
