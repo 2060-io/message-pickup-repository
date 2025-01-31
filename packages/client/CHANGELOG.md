@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.8](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-client@v0.0.7...@2060.io/message-pickup-repository-client@v0.0.8) (2025-01-27)
+
+
+### Features
+
+* Introduce FCM and APNS push notification services ([#50](https://github.com/2060-io/message-pickup-repository/issues/50)) ([30df7f7](https://github.com/2060-io/message-pickup-repository/commit/30df7f75e6f51e08ad9911a1bea8621ce3bd8a68))
+
 ## [0.0.7](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/message-pickup-repository-client@v0.0.6...@2060.io/message-pickup-repository-client@v0.0.7) (2024-11-13)
 
 
