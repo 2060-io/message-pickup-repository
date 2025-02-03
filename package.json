@@ -4,6 +4,7 @@
   "license": "Apache-2.0",
   "description": "Message Pickup Repository implementations for Credo agents",
   "workspaces": [
+    "apps/*",
     "packages/*"
   ],
   "repository": {
