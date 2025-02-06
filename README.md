@@ -6,7 +6,7 @@ This monorepo contains different implementations of `MessagePickupRepository` in
 
 ### Postgres Message Pickup Repository for Credo TS
 
-This is the simplest one: a fully featured implementation that supports Message Pickup V2 in a multi-instance environment and only requires a PostgreSQL database, which could be on the same host than Credo's wallet. Check out its documentation [here](./pakages/postgres/README.md).
+This is the simplest one: a fully featured implementation that supports Message Pickup V2 in a multi-instance environment and only requires a PostgreSQL database, which could be on the same host than Credo's wallet. Check out its documentation [here](./packages/postgres/README.md).
 
 ### WebSocket-based Message Pickup Repository client/server
 
