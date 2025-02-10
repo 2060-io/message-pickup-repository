@@ -1,0 +1,17 @@
+@startuml
+
+interface API as "MPR API"
+interface NS as "Push Notification Service"
+component MPR as "Message Pickup Repository" {
+component Gateway
+database Redis
+database MongoDB
+}
+
+
+API <-> Gateway
+Gateway <-> Redis
+Gateway <--> MongoDB
+Gateway --> NS
+
+@enduml
