@@ -1,6 +1,6 @@
 # WebSocket-based Message Pickup Repository Server for Credo TS
 
-## Description
+## Overview
 
 Message Pickup Repository (MPR) is a service designed to help on multi-instance, horizontally scalable mediators built on top of [Credo](https://github.com/openwallet-foundation/credo-ts). It proposes an efficient way of managing Message Pickup Live Mode sessions, allowing each mediator instance to be notified immediately when new messages for their connected clients.
 
@@ -22,7 +22,9 @@ MPR also interacts with a _Push Notification Service_, responsible for notifying
 
 MPR API consists mainly on messages to retrieve and add messages to pickup queue, and to add/remove Live Mode Message Pickup sessions in order to be notified when a DIDComm message for a given DIDComm recipient is received. 
 
-The protocol is built on top of JSON-RPC 2.0 using WebSocket as transport. All methods match as much as possible (in terms of name and params) those of credo-ts' `MessagePickupRepository` interface, but adds some others used to handle sessions (subscriptions to Redis cache). 
+The protocol is built on top of JSON-RPC 2.0 using WebSocket as transport. All methods match as much as possible (in terms of name and params) those of credo-ts' `MessagePickupRepository` interface, but adds some others used to handle sessions (subscriptions to Redis cache).
+
+This API is fully implemented by [MPR Client](../../packages/client/README.md), a package meant to be plugged-in into Credo mediator instances.
 
 For more information on how the server works, including details on WebSocket methods, pub/sub, and push notifications, check out the [Message Pickup Repository Server API Documentation](./docs/api.md).
 
@@ -35,6 +37,8 @@ There is also another mediator instance that simply receives messages coming fro
 Of course, it would be possible for each mediator instance to hold both roles if it suits best for the deployment model we want to follow.
 
 ![Deployment example](./docs/diagrams/deployment-example.png)
+
+For more examples and diagrams to better understand how MPR works (and the motivation behind it), check out [these flows](./docs/flows.md).
 
 ## Set-up
 
