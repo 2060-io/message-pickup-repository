@@ -1,0 +1,35 @@
+@startuml
+title Sudden Live Mode closing/opening issue
+participant Recipient
+participant Sender
+participant Client1 as "MPR Client1"
+participant Client2 as "MPR Client2"
+participant Client3 as "MPR Client3"
+participant Server as "MPR Gateway"
+participant Redis as "Redis"
+
+Recipient -> Client1: Open WS, start live mode
+Client1 -> Server: addLiveModeSession(recipient)
+Server -> Redis: subscribe(recipient)
+...
+Sender -> Client3: "msg = DIDComm message"(for recipient)
+Client3 -> Server: addMessageToQueue(msg, recipient)
+Server -> Redis: publish(msg, recipient)
+Server -> Client1: messageReceived(msg, recipient)
+Client1 -> Recipient: delivery(msg)
+Recipient -> Client1: acknowledge(msg)
+Recipient -> Client1: Close WS
+note over Recipient, Redis
+At this point, Recipient suddenly closes WS with MPR Client1 and opens a new one on MPR Client2, before MPR Gateway gets the acknowledge
+end note
+Recipient -> Client2: Open WS, start live mode
+Client2 -> Server: addLiveModeSession(recipient)
+Server -> Redis: unsubscribe(recipient) - Client 1
+Server -> Server: Msgs 'sending' to 'pending'
+Client2 -> Server: takeFromQueue()
+Client1 -> Server: removeMessages(msg)
+Server -> Client2: takeFromQueueRsp
+Server -> Redis: subscribe(recipient) - Client 2
+Client1 -> Server: removeLiveModeSession(recipient)
+Server -> Redis: unsubscribe(recipient)
+@enduml

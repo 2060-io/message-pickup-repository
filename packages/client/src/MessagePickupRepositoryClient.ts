@@ -10,7 +10,6 @@ import {
   ConnectionInfo,
 } from './interfaces'
 import {
-  AddMessageOptions,
   GetAvailableMessageCountOptions,
   MessagePickupRepository,
   QueuedMessage,
@@ -31,7 +30,8 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   }
 
   /**
-   * Connect to the WebSocket server.
+   * Establishes a WebSocket connection to the server.
+   *
    * @returns {Promise<void>}
    */
   async connect(): Promise<void> {
@@ -106,7 +106,7 @@ export class MessagePickupRepositoryClient implements MessagePickupRepository {
   /**
    * Sets the callback function to retrieve connection-specific information.
    * This callback provides the `ConnectionInfo` object, containing details like
-   * the FCM notification token and max receive bytes, based on the given `connectionId`.
+   * Push notification token and max receive bytes, based on the given `connectionId`.
    *
    * @param {function} callback - A function that takes a `connectionId` as a parameter and returns
    * a `Promise` that resolves to a `ConnectionInfo` object or `undefined` if no information is available.

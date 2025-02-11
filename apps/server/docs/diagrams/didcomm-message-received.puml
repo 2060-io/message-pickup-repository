@@ -1,0 +1,14 @@
+@startuml
+participant Client as "MPR Client"
+participant Server as "MPR Gateway"
+participant Redis as "Redis"
+participant PNS as "Push Notification Sender"
+
+Client -> Server: addMessageToQueue(recipient, msg)
+Server -> Redis: publish(recipient, msg)
+alt "There is an ongoing Live Mode session"
+Server -> Client: messagesReceived(recipient, \n[pending_msgs, msg])
+else  "There is not an ongoing LiveMode Session"
+Server -> PNS: sendNotification
+end 
+@enduml

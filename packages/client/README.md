@@ -1,276 +1,87 @@
-# MessagePickupRepositoryClient API Usage Documentation
+# WebSocket-based MessagePickupRepository client
 
 ## Overview
 
-The `MessagePickupRepositoryClient` is a client library designed to interact with the Message Pickup repository Server to manage messaging queues and liveSession data. This document provides detailed usage examples and method descriptions.
+`MessagePickupRepositoryClient` is a client library designed to interact with [Message Pickup repository Server](https://github.com/2060-io/message-pickup-repository/tree/main/apps/server) to manage messaging queues and Live Mode message pickup session data. 
 
 ## Table of Contents
 
-1. [Installation](#installation)
-2. [Available Methods](#available-methods)
-   - [connect()](#connect)
-   - [messagesReceived()](#messagesReceived)
-   - [takeFromQueue()](#takeFromQueue)
-   - [getAvailableMessageCount()](#getAvailableMessageCount)
-   - [addMessage()](#addMessage)
-   - [removeMessages()](#removeMessages)
-   - [removeAllMessages()](#removeAllMessages)
-   - [getLiveSession()](#getLiveSession)
-   - [addLiveSession()](#addLiveSession)
-   - [removeLiveSession()](#removeLiveSession)
-   - [ping()](#ping)
-   - [disconnect()](#disconnect)
-3. [Usage](#usage)
+- [WebSocket-based MessagePickupRepository client](#websocket-based-messagepickuprepository-client)
+  - [Overview](#overview)
+  - [Table of Contents](#table-of-contents)
+  - [Installation](#installation)
+  - [Usage](#usage)
 
 ## Installation
 
-To use this client, make sure you have the `rpc-websockets` and `@nestjs/common` packages installed.
+To use this client, simply install the package from npm:
 
 ```bash
-npm install rpc-websockets @nestjs/common
+npm install @2060.io/message-pickup-repository-client
 ```
-
-## Available Methods
-
-### `connect()`
-
-Establishes a WebSocket connection to the server.
-
-- **Returns**: `Promise<void>`
-
----
-
-### `messagesReceived(callback)`
-
-Registers a callback to handle `messagesReceived` events from the WebSocket server. This method will be primarily used to receive new messages that are published by the server.
-
-- **Parameters**:
-
-  - `callback`: A function that receives the `JsonRpcParamsMessage` containing:
-    - `connectionId: string`: The connection ID.
-    - `message: QueuedMessage[]`: Array of queued messages.
-
-- **Returns**: `void`
-
----
-
-### `setConnectionInfo(callback)`
-
-Registers a callback function to retrieve connection-specific information based on a given `connectionId`. This callback provides the `ConnectionInfo` object, which contains details such as the push notification token and maximum bytes allowed for receiving messages. This function is useful for dynamically fetching connection-related information whenever it is required by the client.
-
-- **Parameters**:
-
-  - `callback`: A function that takes a `connectionId` (string) and returns a `Promise` resolving to a `ConnectionInfo` object or `undefined` if no information is available for the given `connectionId`.
-    - `connectionId` (string): The ID of the connection for which to retrieve information.
-
-- **Returns**: `Promise<ConnectionInfo | undefined>`:
-
-  The resolved connection-specific information. This object includes:
-
-  - `pushNotificationToken` (optional, object): Contains details about the push notification token for the connection.
-
-    - `type` (string): Specifies the notification type, e.g., `fcm` for Firebase Cloud Messaging or `apn` for Apple Push Notification Service ().
-    - `token` (optional, string): The actual notification token for the device.
-
-  - `maxReceiveBytes` (optional, number): The maximum byte size allowed for messages received on this connection.
-
----
-
-### `takeFromQueue(params)`
-
-Retrieves messages from the queue.
-
-- **Parameters**: `TakeFromQueueOptions`
-
-  - `connectionId: string`: ID of the connection.
-  - `recipientDid?: string`: Optional DID of the recipient.
-  - `limit?: number`: Optional limit on the number of messages.
-  - `limitBytes?: number`: Optional byte size limit for retrieving messages
-  - `deleteMessages?: boolean`: Whether to delete the messages after retrieval.
-
-- **Returns**: `Promise<QueuedMessage[]>`
-
----
-
-### `getAvailableMessageCount(params)`
-
-Retrieves the number of available messages in the queue.
-
-- **Parameters**: `GetAvailableMessageCountOptions`
-
-  - `connectionId: string`: ID of the connection.
-  - `recipientDid?: string`: Optional DID to filter the message count.
-
-- **Returns**: `Promise<number>`
-
----
-
-### `addMessage(params)`
-
-Adds a message to the message queue.
-
-- **Parameters**: `AddMessageOptions`
-
-  - `connectionId: string`: ID of the connection.
-  - `recipientDids: string[]`: Array of recipient DIDs.
-  - `payload: EncryptedMessage`: The encrypted message content.
-
-- **Returns**: `Promise<string | null>`
-
----
-
-### `removeMessages(params)`
-
-Removes specific messages from the queue.
-
-- **Parameters**: `RemoveMessagesOptions`
-
-  - `connectionId: string`: ID of the connection.
-  - `messageIds: string[]`: Array of message IDs to remove.
-
-- **Returns**: `Promise<void>`
-
----
-
-### `removeAllMessages(params)`
-
-Removes all messages associated with a connection and recipient DID.
-
-- **Parameters**: `RemoveAllMessagesOptions`
-
-  - `connectionId: string`: ID of the connection.
-  - `recipientDid: string`: DID of the recipient.
-
-- **Returns**: `Promise<void>`
-
----
-
-### `getLiveSession(params)`
-
-Retrieves live session data.
-
-- **Parameters**: `ConnectionIdOptions`
-
-  - `connectionId: string`: ID of the connection.
-
-- **Returns**: `Promise<boolean | null>`
-
----
-
-### `addLiveSession(params)`
-
-Adds a live session.
-
-- **Parameters**: `AddLiveSessionOptions`
-
-  - `connectionId: string`: ID of the connection.
-  - `sessionId: string`: ID of the session.
-
-- **Returns**: `Promise<boolean>`
-
----
-
-### `removeLiveSession(params)`
-
-Removes a live session.
-
-- **Parameters**: `ConnectionIdOptions`
-
-  - `connectionId: string`: ID of the connection.
-
-- **Returns**: `Promise<boolean>`
-
----
-
-### `ping()`
-
-Sends a ping request to the server to check the connection.
-
-- **Returns**: `Promise<string>`
-
----
-
-### `disconnect()`
-
-Disconnects from the WebSocket server.
-
-- **Returns**: `Promise<void>`
 
 ## Usage
 
-Here is a simple usage example:
+Setting up `MessagePickupRepositoryClient` is quite simple if you have some prior experience with Credo. We can summarize it in three steps: create, initialize and inject into a Credo instance.
 
-```typescript
-import { MessagePickupRepositoryClient } from '@2060.io/message-pickup-repository-client'
+First of all, you must construct an instance specifying MPR server URL:
 
-async function runClient() {
-  const client = new MessagePickupRepositoryClient('ws://localhost:3500')
+```ts
+  const messagePickupRepository = new MessagePickupRepositoryClient({url: 'ws://localhost:3500'})
+```
 
-  try {
-    // Connect to the WebSocket server
-    await client.connect()
-    console.log('Connected to the WebSocket server.')
+Then, you need to register **callbacks** and connect to the server:
 
-    // Register message receive callback
-    client.messagesReceived((data) => {
-      console.log('Received message:', data)
+- **setConnectionInfo**: it is called by MPR client when it needs to get some specific DIDComm connection data. It is mostly needed to retrieve the Push notification token that MPR Gateway will use to notify offline clients
+- **messagesReceived**: this callback informs that a message has been received for a client connected to this mediator instance. By using this callback, the instance can deliver the message immediately by using Credo's `MessagePickupApi.deliverMessages` method
+
+
+```ts
+    messagePickupRepository.setConnectionInfo(async (connectionId: string): Promise<ConnectionInfo | undefined> => {
+      const connectionRecord = await agent.connections.findById(connectionId)
+      return {
+        fcmNotificationToken: connectionRecord?.getTag('device_token') as string | undefined,
+        maxReceiveBytes: config.messagePickupMaxReceiveBytes,
+      }
     })
 
-    // Add a message to the queue
-    await client.addMessage({
-      connectionId: 'test-connection',
-      recipientDids: ['did:example:123'],
-      payload: 'Encrypted message content',
+    messagePickupRepository.messagesReceived(async (data) => {
+      const { connectionId, messages } = data
+
+      logger.debug(`[messagesReceived] init with ${connectionId} message to ${JSON.stringify(messages, null, 2)}`)
+
+      const liveSession = await agent.messagePickup.getLiveModeSession({ connectionId })
+
+      if (liveSession) {
+        logger.debug(`[messageReceived] found LiveSession for connectionId ${connectionId}, Delivering Messages`)
+
+        await agent.messagePickup.deliverMessages({
+          pickupSessionId: liveSession.id,
+          messages,
+        })
+      } else {
+        logger.debug(`[messagesReceived] not found LiveSession for connectionId ${connectionId}`)
+      }
     })
 
-    // Get available message count
-    const count = await client.getAvailableMessageCount({ connectionId: 'test-connection' })
-    console.log('Available messages count:', count)
+    await messagePickupRepository.connect()
 
-    // Retrieve messages from the queue
-    const messages = await client.takeFromQueue({
-      connectionId: 'test-connection',
-      limit: 10,
-      deleteMessages: true,
-    })
-    console.log('Retrieved messages:', messages)
+```
 
-    // Remove specific messages from the queue
-    await client.removeMessages({
-      connectionId: 'test-connection',
-      messageIds: ['message-1', 'message-2'],
-    })
+Finally, inject the `MessagePickupRepositoryClient` and initialize the `Agent`:
 
-    // Remove all messages for a connection and recipient
-    await client.removeAllMessages({
-      connectionId: 'test-connection',
-      recipientDid: 'did:example:123',
-    })
+```ts
 
-    // Get live session data
-    const liveSession = await client.getLiveSession({ connectionId: 'test-connection' })
-    console.log('Live session data:', liveSession)
+const agent = new Agent({
+  dependencies: agentDependencies,
+  config: { label: 'Test' },
+  modules: {
+    mediator: new MediatorModule({ messageForwardingStrategy: MessageForwardingStrategy.QueueOnly }),
+    messagePickup: new MessagePickupModule({
+      messagePickupRepository,
+    }),
+  },
+})
 
-    // Add a live session
-    await client.addLiveSession({
-      connectionId: 'test-connection',
-      sessionId: 'live-session-id',
-    })
-
-    // Remove a live session
-    await client.removeLiveSession({ connectionId: 'test-connection' })
-
-    // Ping the server to check the connection
-    const pong = await client.ping()
-    console.log('Ping response:', pong)
-
-    // Disconnect the client
-    await client.disconnect()
-    console.log('Disconnected from WebSocket server.')
-  } catch (error) {
-    console.error('An error occurred:', error)
-  }
-}
-
-runClient()
+await agent.initilize()
 ```

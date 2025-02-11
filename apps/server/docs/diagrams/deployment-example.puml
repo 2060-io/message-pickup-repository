@@ -1,0 +1,22 @@
+@startuml
+
+component C1 as "Mediatee 1"
+component C2 as "Mediatee 2"
+component Mediator {
+component M1 as "Mediator Instance 1"
+component M2 as "Mediator Instance 2"
+component M3 as "Mediator Instance 3"
+}
+component Sender as "External Sender"
+component MPR as "Message Pickup Repository"
+interface API as "MPR API"
+
+C1 <-> M1: WebSocket
+C2 <--> M2: WebSocket
+M1 <--> API
+M2 <--> API
+API <-> MPR
+API <-- M3
+Sender --> M3: HTTP
+
+@enduml

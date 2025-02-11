@@ -1,0 +1,11 @@
+@startuml
+participant Client as "MPR Client"
+participant Server as "MPR Gateway"
+participant Redis as "Redis"
+
+Client -> Server: addLiveModeSession(recipient)
+Server -> Redis: subscribe(recipient)
+...
+Client -> Server: removeLiveModeSession(recipient)
+Server -> Redis: unsubscribe(recipient)
+@enduml
