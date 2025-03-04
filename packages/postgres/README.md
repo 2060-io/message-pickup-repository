@@ -84,7 +84,7 @@ const connectionInfoCallback = async (connectionId) => {
           const connectionRecord = await this.agent.connections.findById(connectionId)
           const token = connectionRecord?.getTag('device_token') as string | null
           return {
-   sendPushNotification: token ? (messageId) => { this.notificationSender.send(token, messageId }: undefined,
+   handleNotificationEvent: token ? (messageId) => { this.notificationSender.send(token, messageId }: undefined,
  }
 }
 await messagePickupRepository.initialize({ agent, connectionInfoCallback })
@@ -123,7 +123,7 @@ const connectionInfoCallback = async (connectionId: string) => {
   const token = connectionRecord?.getTag('device_token') as string | null
 
   return {
-    sendPushNotification: token
+    handleNotificationEvent: token
       ? (messageId: string) => {
           notificationSender.send(token, messageId)
         }
