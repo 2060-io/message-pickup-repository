@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.8](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/credo-ts-message-pickup-repository-pg@v0.0.7...@2060.io/credo-ts-message-pickup-repository-pg@v0.0.8) (2025-04-02)
+
+
+### Features
+
+* improvements to the Postgres package ([#55](https://github.com/2060-io/message-pickup-repository/issues/55)) ([e40ca72](https://github.com/2060-io/message-pickup-repository/commit/e40ca72f509658006edb917004f56f9a88e4ac89))
+
 ## [0.0.7](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/credo-ts-message-pickup-repository-pg@v0.0.6...@2060.io/credo-ts-message-pickup-repository-pg@v0.0.7) (2025-01-10)
 
 
