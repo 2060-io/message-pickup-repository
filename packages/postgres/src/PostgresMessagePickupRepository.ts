@@ -25,8 +25,10 @@ import {
   createTableMessage,
   createTypeMessageState,
   liveSessionTableIndex,
+  liveSessionTableMigration,
   liveSessionTableName,
   messageTableIndex,
+  messagesTableMigration,
   messagesTableName,
 } from './config/dbCollections'
 import {
@@ -417,13 +419,14 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
    *
    */
   private async buildPgDatabase(): Promise<void> {
-    this.logger?.info('[buildPgDatabase] PostgresDbService Initializing')
+    this.logger?.info(`[buildPgDatabase] PostgresDbService Initializing ${this.postgresDatabaseName}`)
 
     const clientConfig = {
       user: this.postgresUser,
       host: this.postgresHost,
       password: this.postgresPassword,
       port: 5432,
+      database: 'postgres',
     }
 
     const poolConfig = {
@@ -458,16 +461,27 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
         await dbClient.connect()
 
         // Use advisory lock to prevent race conditions
-        await client.query('SELECT pg_advisory_lock(99999)')
+        await dbClient.query('SELECT pg_advisory_lock(99999)')
 
-        // Check if the 'messagesTableName' table exists.
-        const messageTableResult = await dbClient.query(`SELECT to_regclass('${messagesTableName}')`)
-        if (!messageTableResult.rows[0].to_regclass) {
-          // If it doesn't exist, create the table.
+        // Check if the enum type 'message_state' exists
+        const messageStateTypeExists = await dbClient.query(
+          `SELECT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'message_state') AS exists`,
+        )
+
+        if (!messageStateTypeExists.rows[0].exists) {
           await dbClient.query(createTypeMessageState)
+          this.logger?.info(`[buildPgDatabase] Type 'message_state' created`)
+        }
+
+        // Check if the messages table exists
+        const messageTableExists = await dbClient.query(
+          `SELECT to_regclass('${messagesTableName}') IS NOT NULL AS exists`,
+        )
+
+        if (!messageTableExists.rows[0].exists) {
           await dbClient.query(createTableMessage)
           await dbClient.query(messageTableIndex)
-          this.logger?.info(`[buildPgDatabase] PostgresDbService Table "${messagesTableName}" created.`)
+          this.logger?.info(`[buildPgDatabase] Table "${messagesTableName}" created`)
         }
 
         // Check if the table exists.
@@ -481,6 +495,35 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
           // If the table exists, clean it (truncate or delete, depending on your requirements).
           await dbClient.query(`TRUNCATE TABLE ${liveSessionTableName}`)
           this.logger?.info(`[buildPgDatabase] PostgresDbService Table "${liveSessionTableName}" cleared.`)
+        }
+
+        // verify if needs migrations old database
+
+        const queuedmessageExists = await dbClient.query(`SELECT to_regclass('queuedmessage') IS NOT NULL AS exists`)
+        const livesessionExists = await dbClient.query(`SELECT to_regclass('livesession') IS NOT NULL AS exists`)
+
+        const shouldRunMigration = queuedmessageExists.rows[0].exists && livesessionExists.rows[0].exists
+
+        if (shouldRunMigration) {
+          this.logger?.info(`[buildPgDatabase] Running migration to new schema`)
+
+          try {
+            // Execute new schema migrations (create new tables)
+            await dbClient.query(messagesTableMigration)
+            await dbClient.query(liveSessionTableMigration)
+
+            this.logger?.info(`[buildPgDatabase]  Migration completed successfully`)
+
+            // Drop old legacy tables after migration
+            await dbClient.query('DROP TABLE IF EXISTS queuedmessage;')
+            await dbClient.query('DROP TABLE IF EXISTS livesession;')
+
+            this.logger?.info(`[buildPgDatabase] Old legacy tables dropped`)
+          } catch (error) {
+            this.logger?.error(`[buildPgDatabase] Error while running schema migration ${error}`)
+          }
+        } else {
+          this.logger?.info(`[buildPgDatabase] Skipping migration (tables not found)`)
         }
 
         // Unlock after table creation
