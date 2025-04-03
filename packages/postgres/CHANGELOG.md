@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.9](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/credo-ts-message-pickup-repository-pg@v0.0.8...@2060.io/credo-ts-message-pickup-repository-pg@v0.0.9) (2025-04-03)
+
+
+### Bug Fixes
+
+* Fix a connection add database postgres as default ([#57](https://github.com/2060-io/message-pickup-repository/issues/57)) ([d16a028](https://github.com/2060-io/message-pickup-repository/commit/d16a0285716343c925998b8b7d319dd27aab1871))
+
 ## [0.0.8](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/credo-ts-message-pickup-repository-pg@v0.0.7...@2060.io/credo-ts-message-pickup-repository-pg@v0.0.8) (2025-04-02)
 
 
