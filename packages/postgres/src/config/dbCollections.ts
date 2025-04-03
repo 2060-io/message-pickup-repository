@@ -28,3 +28,26 @@ CREATE TABLE IF NOT EXISTS ${liveSessionTableName} (
 export const messageTableIndex = `CREATE INDEX IF NOT EXISTS "${messagesTableName}_connection_id_idx" ON "${messagesTableName}" (connection_id);`
 
 export const liveSessionTableIndex = `CREATE INDEX IF NOT EXISTS "${liveSessionTableName}_connection_id_idx" ON "${liveSessionTableName}" USING btree (connection_id);`
+
+export const messagesTableMigration = `
+    INSERT INTO queued_message (id, connection_id, recipient_dids, encrypted_message, state, created_at)
+    SELECT
+      gen_random_uuid(),  -- nuevo id
+      connectionid,
+      recipientKeys,
+      encryptedMessage,
+      'pending',
+      created_at
+    FROM queuedmessage
+  `
+
+export const liveSessionTableMigration = `
+    INSERT INTO live_session (session_id, connection_id, protocol_version, instance, created_at)
+    SELECT
+      sessionid,
+      connectionid,
+      protocolVersion,
+      instance,
+      created_at
+    FROM livesession
+  `
