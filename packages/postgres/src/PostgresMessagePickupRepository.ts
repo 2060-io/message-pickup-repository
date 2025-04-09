@@ -187,7 +187,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
         ORDER BY created_at 
         LIMIT $3
       )
-      RETURNING id, encryptedmessage, state;
+      RETURNING id, encrypted_message, state;
     `
       const params = [connectionId, recipientDid, limit ?? 0]
       const result = await this.messagesCollection?.query(query, params)
