@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.11](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/credo-ts-message-pickup-repository-pg@v0.0.10...@2060.io/credo-ts-message-pickup-repository-pg@v0.0.11) (2025-04-10)
+
+
+### Bug Fixes
+
+* Correct field name 'encrypted_message' in return mapping takeFromQueue function. ([#61](https://github.com/2060-io/message-pickup-repository/issues/61)) ([54310e2](https://github.com/2060-io/message-pickup-repository/commit/54310e2edab19ef65a7ee37ece10883b85664ca0))
+
 ## [0.0.10](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/credo-ts-message-pickup-repository-pg@v0.0.9...@2060.io/credo-ts-message-pickup-repository-pg@v0.0.10) (2025-04-09)
 
 
