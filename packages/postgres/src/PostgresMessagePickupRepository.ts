@@ -172,7 +172,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
 
         return result.rows.map((message) => ({
           id: message.id,
-          encryptedMessage: message.encryptedmessage,
+          encryptedMessage: message.encrypted_message,
           state: message.state,
         }))
       }
