@@ -2,7 +2,7 @@
   "name": "@2060.io/credo-ts-message-pickup-repository-pg",
   "main": "build/index.js",
   "types": "build/index.d.ts",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "files": [
     "build"
   ],
