@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.12](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/credo-ts-message-pickup-repository-pg@v0.0.11...@2060.io/credo-ts-message-pickup-repository-pg@v0.0.12) (2025-04-10)
+
+
+### Bug Fixes
+
+* Fix all references encryptedmessages column database old schema ([#63](https://github.com/2060-io/message-pickup-repository/issues/63)) ([eb46421](https://github.com/2060-io/message-pickup-repository/commit/eb4642141ab174ab094569ddccd087fa3444f2bb))
+
 ## [0.0.11](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/credo-ts-message-pickup-repository-pg@v0.0.10...@2060.io/credo-ts-message-pickup-repository-pg@v0.0.11) (2025-04-10)
 
 
