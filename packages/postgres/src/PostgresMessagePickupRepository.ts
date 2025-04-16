@@ -37,7 +37,8 @@ import {
   MessageQueuedEventType,
   PostgresMessagePickupRepositoryConfig,
 } from './interfaces'
-
+import { runSqlMigrations } from './utils/migrationUtils'
+import { error } from 'node:console'
 @injectable()
 export class PostgresMessagePickupRepository implements MessagePickupRepository {
   private logger?: Logger
@@ -49,6 +50,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
   private postgresPassword: string
   private postgresHost: string
   private postgresDatabaseName: string
+  private enableMigrations: boolean
 
   public constructor(options: PostgresMessagePickupRepositoryConfig) {
     const { logger, postgresUser, postgresPassword, postgresHost, postgresDatabaseName } = options
@@ -58,6 +60,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
     this.postgresPassword = postgresPassword
     this.postgresHost = postgresHost
     this.postgresDatabaseName = postgresDatabaseName || 'messagepickuprepository'
+    this.enableMigrations = process.env.ENABLE_DB_MIGRATIONS === 'true'
 
     // Initialize instanceName
     this.instanceName = `${os.hostname()}-${process.pid}-${randomUUID()}`
@@ -85,6 +88,8 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
       // Initialize the database
       await this.buildPgDatabase()
       this.logger?.info('[initialize] The database has been build successfully')
+
+      await this.migrateDatabase()
 
       // Configure PostgreSQL pool for the messages collections
       this.messagesCollection = new Pool({
@@ -682,5 +687,32 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
         session,
       },
     })
+  }
+
+  /**
+   * Executes SQL-based migrations from the /migrations directory if enabled via config.
+   * Uses the internal pool (messagesCollection) after buildPgDatabase has completed.
+   * Logs any errors but does not stop execution.
+   */
+  public async migrateDatabase(): Promise<void> {
+    if (!this.enableMigrations) {
+      this.logger?.info('[migrateDatabase] Migrations are disabled via config.')
+      return
+    }
+
+    if (!this.messagesCollection) {
+      this.logger?.warn('[migrateDatabase] Connection pool is not initialized. Skipping migrations.')
+      return
+    }
+
+    this.logger?.info('[migrateDatabase] Running SQL file-based migrations...')
+
+    try {
+      await runSqlMigrations(this.messagesCollection)
+      this.logger?.info('[migrateDatabase] Migration process completed successfully.')
+    } catch (error) {
+      this.logger?.error(`[migrateDatabase] Migration failed: ${(error as Error).message}`)
+      this.logger?.warn('[migrateDatabase] Continuing without applying pending migrations.')
+    }
   }
 }
