@@ -49,3 +49,7 @@ SELECT
   instance,
   created_at
 FROM livesession;
+
+DROP TABLE IF EXISTS queuedmessage;
+
+DROP TABLE IF EXISTS livesession;
