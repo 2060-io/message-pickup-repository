@@ -39,7 +39,6 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
   private postgresPassword: string
   private postgresHost: string
   private postgresDatabaseName: string
-  private enableMigrations: boolean
 
   public constructor(options: PostgresMessagePickupRepositoryConfig) {
     const { logger, postgresUser, postgresPassword, postgresHost, postgresDatabaseName } = options
