@@ -49,7 +49,6 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
     this.postgresPassword = postgresPassword
     this.postgresHost = postgresHost
     this.postgresDatabaseName = postgresDatabaseName || 'messagepickuprepository'
-    this.enableMigrations = process.env.ENABLE_DB_MIGRATIONS === 'true'
 
     // Initialize instanceName
     this.instanceName = `${os.hostname()}-${process.pid}-${randomUUID()}`

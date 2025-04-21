@@ -72,12 +72,6 @@ Or if used in the repository:
 await messageRepository.initialize({ agent })
 ```
 
-Make sure to set the environment variable:
-
-```bash
-ENABLE_DB_MIGRATIONS=true
-```
-
 ## 🧪 Migration Tracking Table
 
 A table called `schema_version` will be created automatically:
