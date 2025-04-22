@@ -1,28 +1,25 @@
 import { Client, Pool } from 'pg'
 import fs from 'fs'
 import path from 'path'
+import { Logger } from '@credo-ts/core'
 
 /**
  * Runs all pending SQL migrations in a target PostgreSQL database.
  * - Automatically creates the database if it does not exist.
  * - Applies versioned `.sql` files from a directory.
  *
+ * @param logger - Optional Credo-compatible logger instance
  * @param postgresConfig - Connection config to connect as superuser (to create DB if needed).
  * @param targetDatabase - Name of the target database to migrate.
  * @param migrationsDir - Directory where migration `.sql` files are located.
  */
 export async function buildPgDatabaseWithMigrations(
+  logger: Logger | undefined,
   postgresConfig: { user: string; password: string; host: string; port?: number },
   targetDatabase: string,
   migrationsDir: string = path.resolve(__dirname, '../migrations'),
 ): Promise<void> {
-  const adminClient = new Client({
-    user: postgresConfig.user,
-    password: postgresConfig.password,
-    host: postgresConfig.host,
-    port: postgresConfig.port ?? 5432,
-    database: 'postgres',
-  })
+  const adminClient = new Client(postgresConfig)
 
   try {
     await adminClient.connect()
@@ -32,26 +29,20 @@ export async function buildPgDatabaseWithMigrations(
 
     if (existsResult.rowCount === 0) {
       await adminClient.query(`CREATE DATABASE ${targetDatabase}`)
-      console.info(`[migration] Database "${targetDatabase}" created.`)
+      logger?.info(`[migration] Database "${targetDatabase}" created.`)
     } else {
-      console.info(`[migration] Database "${targetDatabase}" already exists.`)
+      logger?.info(`[migration] Database "${targetDatabase}" already exists.`)
     }
 
     await adminClient.end()
   } catch (error) {
-    console.error(`[migration] Failed to create database "${targetDatabase}": ${(error as Error).message}`)
+    logger?.error(`[migration] Failed to create database "${targetDatabase}": ${(error as Error).message}`)
     await adminClient.end()
     throw error
   }
 
   // Now connect to the target database using a pool
-  const pool = new Pool({
-    user: postgresConfig.user,
-    password: postgresConfig.password,
-    host: postgresConfig.host,
-    port: postgresConfig.port ?? 5432,
-    database: targetDatabase,
-  })
+  const pool = new Pool({ ...postgresConfig, database: targetDatabase })
 
   const client = await pool.connect()
 
@@ -68,10 +59,10 @@ export async function buildPgDatabaseWithMigrations(
 
     const result = await client.query('SELECT version FROM schema_version ORDER BY id DESC LIMIT 1')
     const currentVersion = result.rows.length > 0 ? result.rows[0].version : 0
-    console.info(`[migration] Current schema version: ${currentVersion}`)
+    logger?.info(`[migration] Current schema version: ${currentVersion}`)
 
     if (!fs.existsSync(migrationsDir)) {
-      console.warn(`[migration] Migrations directory not found: ${migrationsDir}. Skipping.`)
+      logger?.warn(`[migration] Migrations directory not found: ${migrationsDir}. Skipping.`)
       await client.query('COMMIT')
       return
     }
@@ -84,23 +75,23 @@ export async function buildPgDatabaseWithMigrations(
     for (const file of files) {
       const versionMatch = file.match(/^(\d{3,})-/)
       if (!versionMatch) {
-        console.warn(`[migration] Skipping invalid filename: ${file}`)
+        logger?.warn(`[migration] Skipping invalid filename: ${file}`)
         continue
       }
 
       const version = parseInt(versionMatch[1], 10)
       if (version <= currentVersion) {
-        console.debug(`[migration] Skipping already applied: ${file}`)
+        logger?.debug(`[migration] Skipping already applied: ${file}`)
         continue
       }
 
       const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8')
-      console.info(`[migration] Applying migration: ${file}`)
+      logger?.info(`[migration] Applying migration: ${file}`)
 
       try {
         await client.query(sql)
         await client.query(`INSERT INTO schema_version (version) VALUES ($1)`, [version])
-        console.info(`[migration] Applied successfully: ${file}`)
+        logger?.info(`[migration] Applied successfully: ${file}`)
       } catch (fileErr) {
         throw new Error(`[migration] Failed to apply ${file}: ${(fileErr as Error).message}`)
       }
@@ -108,8 +99,8 @@ export async function buildPgDatabaseWithMigrations(
 
     await client.query('COMMIT')
   } catch (err) {
+    logger?.error(`[migration] Migration process failed: ${(err as Error).message}`)
     await client.query('ROLLBACK')
-    console.error('[migration] Migration process failed:', (err as Error).message)
   } finally {
     client.release()
     await pool.end()
