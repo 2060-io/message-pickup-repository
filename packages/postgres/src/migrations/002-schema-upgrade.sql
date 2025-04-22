@@ -10,7 +10,7 @@ END$$;
 
 CREATE TABLE IF NOT EXISTS queued_message (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  connection_id VARCHAR(255),
+  connection_id UUID,
   recipient_dids TEXT[],
   encrypted_message JSONB,
   state message_state NOT NULL,
@@ -19,8 +19,12 @@ CREATE TABLE IF NOT EXISTS queued_message (
 
 CREATE INDEX IF NOT EXISTS queued_message_connection_id_idx ON queued_message (connection_id);
 
+CREATE INDEX IF NOT EXISTS queued_message_connection_id_state_idx ON queued_message (connection_id, state);
+
+CREATE INDEX IF NOT EXISTS queued_message_created_at_idx ON queued_message (created_at);
+
 CREATE TABLE IF NOT EXISTS live_session (
-  session_id VARCHAR(255) PRIMARY KEY,
+  session_id UUID PRIMARY KEY,
   connection_id VARCHAR(50),
   protocol_version VARCHAR(50),
   instance VARCHAR(100),
@@ -34,7 +38,7 @@ CREATE INDEX IF NOT EXISTS live_session_connection_id_idx ON live_session USING 
 INSERT INTO queued_message (id, connection_id, recipient_dids, encrypted_message, state, created_at)
 SELECT
   gen_random_uuid(),
-  connectionId,
+  connectionId::uuid,
   recipientKeys,
   encryptedMessage,
   'pending',
@@ -43,7 +47,7 @@ FROM queuedmessage;
 
 INSERT INTO live_session (session_id, connection_id, protocol_version, instance, created_at)
 SELECT
-  sessionid,
+  sessionid::uuid,
   connectionid,
   protocolVersion,
   instance,
