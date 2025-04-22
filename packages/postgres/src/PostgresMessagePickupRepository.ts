@@ -74,6 +74,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
     try {
       // Initialize the database
       await buildPgDatabaseWithMigrations(
+        this.logger,
         {
           user: this.postgresUser,
           password: this.postgresPassword,
