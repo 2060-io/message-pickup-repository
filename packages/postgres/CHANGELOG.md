@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.13](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/credo-ts-message-pickup-repository-pg@v0.0.12...@2060.io/credo-ts-message-pickup-repository-pg@v0.0.13) (2025-04-24)
+
+
+### Features
+
+* Implement SQL-based schema versioning and migration execution ([#66](https://github.com/2060-io/message-pickup-repository/issues/66)) ([4ce9268](https://github.com/2060-io/message-pickup-repository/commit/4ce926839aa9814558b1d140b723ba7e755f8b25))
+
 ## [0.0.12](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/credo-ts-message-pickup-repository-pg@v0.0.11...@2060.io/credo-ts-message-pickup-repository-pg@v0.0.12) (2025-04-10)
 
 
