@@ -21,23 +21,13 @@ import {
 import { Client, Pool } from 'pg'
 import PGPubsub from 'pg-pubsub'
 import {
-  createTableLive,
-  createTableMessage,
-  createTypeMessageState,
-  liveSessionTableIndex,
-  liveSessionTableMigration,
-  liveSessionTableName,
-  messageTableIndex,
-  messagesTableMigration,
-  messagesTableName,
-} from './config/dbCollections'
-import {
   ExtendedMessagePickupSession,
   MessageQueuedEvent,
   MessageQueuedEventType,
   PostgresMessagePickupRepositoryConfig,
 } from './interfaces'
-
+import { buildPgDatabaseWithMigrations } from './utils/buildPgDatabaseWithMigrations'
+import { error } from 'node:console'
 @injectable()
 export class PostgresMessagePickupRepository implements MessagePickupRepository {
   private logger?: Logger
@@ -83,7 +73,15 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
   public async initialize(options: { agent: Agent }): Promise<void> {
     try {
       // Initialize the database
-      await this.buildPgDatabase()
+      await buildPgDatabaseWithMigrations(
+        this.logger,
+        {
+          user: this.postgresUser,
+          password: this.postgresPassword,
+          host: this.postgresHost,
+        },
+        this.postgresDatabaseName,
+      )
       this.logger?.info('[initialize] The database has been build successfully')
 
       // Configure PostgreSQL pool for the messages collections
@@ -157,7 +155,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
       if (deleteMessages) {
         const query = `
         SELECT id, encrypted_message, state 
-        FROM ${messagesTableName} 
+        FROM queued_message 
         WHERE (connection_id = $1 OR $2 = ANY (recipient_dids)) AND state = 'pending' 
         ORDER BY created_at 
         LIMIT $3
@@ -179,11 +177,11 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
 
       // Use UPDATE and RETURNING to fetch and update messages in one step
       const query = `
-      UPDATE ${messagesTableName}
+      UPDATE queued_message
       SET state = 'sending'
       WHERE id IN (
         SELECT id 
-        FROM ${messagesTableName} 
+        FROM queued_message 
         WHERE (connection_id = $1 OR $2 = ANY (recipient_dids)) 
         AND state = 'pending' 
         ORDER BY created_at 
@@ -228,7 +226,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
       // Query to count pending messages for the specified connection ID
       const query = `
       SELECT COUNT(*) AS count 
-      FROM ${messagesTableName} 
+      FROM queued_message 
       WHERE connection_id = $1 AND state = 'pending'
     `
       const params = [connectionId]
@@ -274,7 +272,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
 
       // Insert message into database
       const query = `
-        INSERT INTO ${messagesTableName}(connection_id, recipient_dids, encrypted_message, state) 
+        INSERT INTO queued_message(connection_id, recipient_dids, encrypted_message, state) 
         VALUES($1, $2, $3, $4) 
         RETURNING id, created_at, encrypted_message
       `
@@ -350,7 +348,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
       const placeholders = messageIds.map((_, index) => `$${index + 2}`).join(', ')
 
       // Construct the SQL DELETE query
-      const query = `DELETE FROM ${messagesTableName} WHERE connection_id = $1 AND id IN (${placeholders})`
+      const query = `DELETE FROM queued_message WHERE connection_id = $1 AND id IN (${placeholders})`
 
       // Combine connectionId with messageIds as query parameters
       const queryParams = [connectionId, ...messageIds]
@@ -415,130 +413,6 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
   }
 
   /**
-   * This method allow create database and tables they are used for the operation of the messageRepository
-   *
-   */
-  private async buildPgDatabase(): Promise<void> {
-    this.logger?.info(`[buildPgDatabase] PostgresDbService Initializing ${this.postgresDatabaseName}`)
-
-    const clientConfig = {
-      user: this.postgresUser,
-      host: this.postgresHost,
-      password: this.postgresPassword,
-      port: 5432,
-      database: 'postgres',
-    }
-
-    const poolConfig = {
-      ...clientConfig,
-      database: this.postgresDatabaseName,
-    }
-
-    const client = new Client(clientConfig)
-
-    try {
-      await client.connect()
-
-      // Use advisory lock to prevent
-      await client.query('SELECT pg_advisory_lock(99998)')
-
-      // Check if the database already exists.
-      const result = await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [this.postgresDatabaseName])
-      this.logger?.debug(`[buildPgDatabase] PostgresDbService exist ${result.rowCount}`)
-
-      if (result.rowCount === 0) {
-        // If it doesn't exist, create the database.
-        await client.query(`CREATE DATABASE ${this.postgresDatabaseName}`)
-        this.logger?.info(`[buildPgDatabase] PostgresDbService Database "${this.postgresDatabaseName}" created.`)
-      }
-
-      await client.query('SELECT pg_advisory_unlock(99998)')
-
-      // Create a new client connected to the specific database.
-      const dbClient = new Client(poolConfig)
-
-      try {
-        await dbClient.connect()
-
-        // Use advisory lock to prevent race conditions
-        await dbClient.query('SELECT pg_advisory_lock(99999)')
-
-        // Check if the enum type 'message_state' exists
-        const messageStateTypeExists = await dbClient.query(
-          `SELECT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'message_state') AS exists`,
-        )
-
-        if (!messageStateTypeExists.rows[0].exists) {
-          await dbClient.query(createTypeMessageState)
-          this.logger?.info(`[buildPgDatabase] Type 'message_state' created`)
-        }
-
-        // Check if the messages table exists
-        const messageTableExists = await dbClient.query(
-          `SELECT to_regclass('${messagesTableName}') IS NOT NULL AS exists`,
-        )
-
-        if (!messageTableExists.rows[0].exists) {
-          await dbClient.query(createTableMessage)
-          await dbClient.query(messageTableIndex)
-          this.logger?.info(`[buildPgDatabase] Table "${messagesTableName}" created`)
-        }
-
-        // Check if the table exists.
-        const liveTableResult = await dbClient.query(`SELECT to_regclass('${liveSessionTableName}')`)
-        if (!liveTableResult.rows[0].to_regclass) {
-          // If it doesn't exist, create the table.
-          await dbClient.query(createTableLive)
-          await dbClient.query(liveSessionTableIndex)
-          this.logger?.info(`[buildPgDatabase] PostgresDbService Table "${liveSessionTableName}" created.`)
-        } else {
-          // If the table exists, clean it (truncate or delete, depending on your requirements).
-          await dbClient.query(`TRUNCATE TABLE ${liveSessionTableName}`)
-          this.logger?.info(`[buildPgDatabase] PostgresDbService Table "${liveSessionTableName}" cleared.`)
-        }
-
-        // verify if needs migrations old database
-
-        const queuedmessageExists = await dbClient.query(`SELECT to_regclass('queuedmessage') IS NOT NULL AS exists`)
-        const livesessionExists = await dbClient.query(`SELECT to_regclass('livesession') IS NOT NULL AS exists`)
-
-        const shouldRunMigration = queuedmessageExists.rows[0].exists && livesessionExists.rows[0].exists
-
-        if (shouldRunMigration) {
-          this.logger?.info(`[buildPgDatabase] Running migration to new schema`)
-
-          try {
-            // Execute new schema migrations (create new tables)
-            await dbClient.query(messagesTableMigration)
-            await dbClient.query(liveSessionTableMigration)
-
-            this.logger?.info(`[buildPgDatabase]  Migration completed successfully`)
-
-            // Drop old legacy tables after migration
-            await dbClient.query('DROP TABLE IF EXISTS queuedmessage;')
-            await dbClient.query('DROP TABLE IF EXISTS livesession;')
-
-            this.logger?.info(`[buildPgDatabase] Old legacy tables dropped`)
-          } catch (error) {
-            this.logger?.error(`[buildPgDatabase] Error while running schema migration ${error}`)
-          }
-        } else {
-          this.logger?.info(`[buildPgDatabase] Skipping migration (tables not found)`)
-        }
-
-        // Unlock after table creation
-        await dbClient.query('SELECT pg_advisory_unlock(99999)')
-      } finally {
-        await dbClient.end()
-      }
-    } catch (error) {
-      this.logger?.error(`[buildPgDatabase] PostgresDbService Error creating database: ${error}`)
-    } finally {
-      await client.end()
-    }
-  }
-
-  /**
    * This function checks that messages from the connectionId, which were left in the 'sending'
    * state after a liveSessionRemove event, are updated to the 'pending' state for subsequent sending
    * @param connectionID
@@ -548,13 +422,13 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
     try {
       this.logger?.debug(`[checkQueueMessages] Init verify messages state 'sending'`)
       const messagesToSend = await this.messagesCollection?.query(
-        `SELECT * FROM ${messagesTableName} WHERE state = $1 and connection_id = $2`,
+        `SELECT * FROM queued_message WHERE state = $1 and connection_id = $2`,
         ['sending', connectionID],
       )
       if (messagesToSend && messagesToSend.rows.length > 0) {
         for (const message of messagesToSend.rows) {
           // Update the message state to 'pending'
-          await this.messagesCollection?.query(`UPDATE ${messagesTableName} SET state = $1 WHERE id = $2`, [
+          await this.messagesCollection?.query(`UPDATE queued_message SET state = $1 WHERE id = $2`, [
             'pending',
             message.id,
           ])
@@ -597,7 +471,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
     if (!connectionId) throw new Error('connectionId is not defined')
     try {
       const queryLiveSession = await this.messagesCollection?.query(
-        `SELECT session_id, connection_id, protocol_version FROM ${liveSessionTableName} WHERE connection_id = $1 LIMIT $2`,
+        `SELECT session_id, connection_id, protocol_version FROM live_session WHERE connection_id = $1 LIMIT $2`,
         [connectionId, 1],
       )
       // Check if liveSession is not empty (record found)
@@ -623,7 +497,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
     if (!session) throw new Error('session is not defined')
     try {
       const insertMessageDB = await this.messagesCollection?.query(
-        `INSERT INTO ${liveSessionTableName} (session_id, connection_id, protocol_version, instance) VALUES($1, $2, $3, $4) RETURNING session_id`,
+        `INSERT INTO live_session (session_id, connection_id, protocol_version, instance) VALUES($1, $2, $3, $4) RETURNING session_id`,
         [id, connectionId, protocolVersion, instance],
       )
       const liveSessionId = insertMessageDB?.rows[0].sessionid
@@ -642,7 +516,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
     if (!connectionId) throw new Error('connectionId is not defined')
     try {
       // Construct the SQL query with the placeholders
-      const query = `DELETE FROM ${liveSessionTableName} WHERE connection_id = $1`
+      const query = `DELETE FROM live_session WHERE connection_id = $1`
 
       // Add connectionId  for query parameters
       const queryParams = [connectionId]

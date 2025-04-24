@@ -18,9 +18,10 @@
     "directory": "packages/postgres"
   },
   "scripts": {
-    "build": "yarn run clean && yarn run compile",
+    "build": "yarn run clean && yarn run compile && yarn run copy:migrations",
     "clean": "rimraf -rf ./build",
     "compile": "tsc -p tsconfig.build.json",
+    "copy:migrations": "cp -r src/migrations build/migrations",
     "prepublishOnly": "yarn run build",
     "test": "jest"
   },
