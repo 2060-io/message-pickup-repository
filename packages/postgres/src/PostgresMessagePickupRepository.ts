@@ -153,21 +153,28 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
     const limitBytes = typeof this.maxReceiveBytes === 'number'
 
     this.logger?.info(
-      `[takeFromQueue] Fetching for ConnectionId: ${connectionId}. Mode: ${limitBytes ? `maxReceiveBytes=${this.maxReceiveBytes}` : `limit=${limit}`}`,
+      `[takeFromQueue] Fetching for ConnectionId: ${connectionId}. Mode: ${
+        limitBytes ? `maxReceiveBytes=${this.maxReceiveBytes}` : `limit=${limit}`
+      }`,
     )
 
     try {
       const paramsBase = [connectionId, recipientDid]
 
       if (deleteMessages) {
+        this.logger?.debug(`[takeFromQueue] deleteMessages=true: fetching messages without state update`)
         const query = limitBytes
           ? `
+          WITH ordered_messages AS (
+            SELECT id, encrypted_message, state,
+                   SUM(encrypted_message_byte_count) OVER (ORDER BY created_at) AS total_bytes
+            FROM queued_message
+            WHERE (connection_id = $1 OR $2 = ANY (recipient_dids))
+              AND state = 'pending'
+          )
           SELECT id, encrypted_message, state
-          FROM queued_message
-          WHERE (connection_id = $1 OR $2 = ANY (recipient_dids))
-            AND state = 'pending'
-            AND encrypted_message_byte_count <= $3
-          ORDER BY created_at
+          FROM ordered_messages
+          WHERE total_bytes <= $3
         `
           : `
           SELECT id, encrypted_message, state
@@ -195,19 +202,24 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
         }))
       }
 
+      this.logger?.debug(`[takeFromQueue] Fetching and marking messages as 'sending'.`)
+
       // If not deleting, update state to 'sending'
       const query = limitBytes
         ? `
-        UPDATE queued_message
-        SET state = 'sending'
-        WHERE id IN (
-          SELECT id
+        WITH ordered_messages AS (
+          SELECT id,
+                 SUM(encrypted_message_byte_count) OVER (ORDER BY created_at) AS total_bytes
           FROM queued_message
           WHERE (connection_id = $1 OR $2 = ANY (recipient_dids))
             AND state = 'pending'
-            AND encrypted_message_byte_count <= $3
-          ORDER BY created_at
+        ),
+        limited_messages AS (
+          SELECT id FROM ordered_messages WHERE total_bytes <= $3
         )
+        UPDATE queued_message
+        SET state = 'sending'
+        WHERE id IN (SELECT id FROM limited_messages)
         RETURNING id, encrypted_message, state
       `
         : `
@@ -239,7 +251,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
       return result.rows.map((message) => ({
         id: message.id,
         encryptedMessage: message.encrypted_message,
-        state: 'sending',
+        state: message.state,
       }))
     } catch (error) {
       this.logger?.error(`[takeFromQueue] Error: ${error}`)
