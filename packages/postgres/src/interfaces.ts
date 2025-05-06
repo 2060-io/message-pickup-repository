@@ -7,6 +7,7 @@ export interface PostgresMessagePickupRepositoryConfig {
   postgresPassword: string
   postgresHost: string
   postgresDatabaseName?: string
+  maxReceiveBytes?: number
 }
 
 export const MessageQueuedEventType: string = 'MessagePickupRepositoryMessageQueued'

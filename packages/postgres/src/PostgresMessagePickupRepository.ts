@@ -39,15 +39,17 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
   private postgresPassword: string
   private postgresHost: string
   private postgresDatabaseName: string
+  private maxReceiveBytes?: number
 
   public constructor(options: PostgresMessagePickupRepositoryConfig) {
-    const { logger, postgresUser, postgresPassword, postgresHost, postgresDatabaseName } = options
+    const { logger, postgresUser, postgresPassword, postgresHost, postgresDatabaseName, maxReceiveBytes } = options
 
     this.logger = logger
     this.postgresUser = postgresUser
     this.postgresPassword = postgresPassword
     this.postgresHost = postgresHost
     this.postgresDatabaseName = postgresDatabaseName || 'messagepickuprepository'
+    this.maxReceiveBytes = maxReceiveBytes
 
     // Initialize instanceName
     this.instanceName = `${os.hostname()}-${process.pid}-${randomUUID()}`
@@ -148,20 +150,45 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
    */
   public async takeFromQueue(options: TakeFromQueueOptions): Promise<QueuedMessage[]> {
     const { connectionId, limit, deleteMessages, recipientDid } = options
-    this.logger?.info(`[takeFromQueue] Initializing method for ConnectionId: ${connectionId}, Limit: ${limit}`)
+    const limitBytes = typeof this.maxReceiveBytes === 'number'
+
+    this.logger?.info(
+      `[takeFromQueue] Fetching for ConnectionId: ${connectionId}. Mode: ${
+        limitBytes ? `maxReceiveBytes=${this.maxReceiveBytes}` : `limit=${limit}`
+      }`,
+    )
 
     try {
-      // If deleteMessages is true, just fetch messages without updating their state
+      const paramsBase = [connectionId, recipientDid]
+
       if (deleteMessages) {
-        const query = `
-        SELECT id, encrypted_message, state 
-        FROM queued_message 
-        WHERE (connection_id = $1 OR $2 = ANY (recipient_dids)) AND state = 'pending' 
-        ORDER BY created_at 
-        LIMIT $3
-      `
-        const params = [connectionId, recipientDid, limit ?? 0]
-        const result = await this.messagesCollection?.query(query, params)
+        this.logger?.debug(`[takeFromQueue] deleteMessages=true: fetching messages without state update`)
+        const query = limitBytes
+          ? `
+          WITH ordered_messages AS (
+            SELECT id, encrypted_message, state,
+                   SUM(encrypted_message_byte_count) OVER (ORDER BY created_at) AS total_bytes
+            FROM queued_message
+            WHERE (connection_id = $1 OR $2 = ANY (recipient_dids))
+              AND state = 'pending'
+          )
+          SELECT id, encrypted_message, state
+          FROM ordered_messages
+          WHERE total_bytes <= $3
+        `
+          : `
+          SELECT id, encrypted_message, state
+          FROM queued_message
+          WHERE (connection_id = $1 OR $2 = ANY (recipient_dids))
+            AND state = 'pending'
+          ORDER BY created_at
+          LIMIT $3
+        `
+
+        const result = await this.messagesCollection?.query(query, [
+          ...paramsBase,
+          limitBytes ? this.maxReceiveBytes : (limit ?? 0),
+        ])
 
         if (!result || result.rows.length === 0) {
           this.logger?.debug(`[takeFromQueue] No messages found for ConnectionId: ${connectionId}`)
@@ -175,22 +202,44 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
         }))
       }
 
-      // Use UPDATE and RETURNING to fetch and update messages in one step
-      const query = `
-      UPDATE queued_message
-      SET state = 'sending'
-      WHERE id IN (
-        SELECT id 
-        FROM queued_message 
-        WHERE (connection_id = $1 OR $2 = ANY (recipient_dids)) 
-        AND state = 'pending' 
-        ORDER BY created_at 
-        LIMIT $3
-      )
-      RETURNING id, encrypted_message, state;
-    `
-      const params = [connectionId, recipientDid, limit ?? 0]
-      const result = await this.messagesCollection?.query(query, params)
+      this.logger?.debug(`[takeFromQueue] Fetching and marking messages as 'sending'.`)
+
+      // If not deleting, update state to 'sending'
+      const query = limitBytes
+        ? `
+        WITH ordered_messages AS (
+          SELECT id,
+                 SUM(encrypted_message_byte_count) OVER (ORDER BY created_at) AS total_bytes
+          FROM queued_message
+          WHERE (connection_id = $1 OR $2 = ANY (recipient_dids))
+            AND state = 'pending'
+        ),
+        limited_messages AS (
+          SELECT id FROM ordered_messages WHERE total_bytes <= $3
+        )
+        UPDATE queued_message
+        SET state = 'sending'
+        WHERE id IN (SELECT id FROM limited_messages)
+        RETURNING id, encrypted_message, state
+      `
+        : `
+        UPDATE queued_message
+        SET state = 'sending'
+        WHERE id IN (
+          SELECT id
+          FROM queued_message
+          WHERE (connection_id = $1 OR $2 = ANY (recipient_dids))
+            AND state = 'pending'
+          ORDER BY created_at
+          LIMIT $3
+        )
+        RETURNING id, encrypted_message, state
+      `
+
+      const result = await this.messagesCollection?.query(query, [
+        ...paramsBase,
+        limitBytes ? this.maxReceiveBytes : (limit ?? 0),
+      ])
 
       if (!result || result.rows.length === 0) {
         this.logger?.debug(`[takeFromQueue] No messages updated for ConnectionId: ${connectionId}`)
@@ -199,11 +248,10 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
 
       this.logger?.debug(`[takeFromQueue] ${result.rows.length} messages updated to "sending" state.`)
 
-      // Return the messages as QueuedMessage objects
       return result.rows.map((message) => ({
         id: message.id,
         encryptedMessage: message.encrypted_message,
-        state: 'sending',
+        state: message.state,
       }))
     } catch (error) {
       this.logger?.error(`[takeFromQueue] Error: ${error}`)
@@ -267,19 +315,28 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
     }
 
     try {
+      // Calculate the size in bytes of the encrypted message to add database
+      const encryptedMessageByteCount = Buffer.byteLength(JSON.stringify(payload), 'utf8')
+
       // Retrieve local live session details
       const localLiveSession = await this.findLocalLiveSession(connectionId)
 
       // Insert message into database
       const query = `
-        INSERT INTO queued_message(connection_id, recipient_dids, encrypted_message, state) 
-        VALUES($1, $2, $3, $4) 
+        INSERT INTO queued_message(connection_id, recipient_dids, encrypted_message, state,encrypted_message_byte_count) 
+        VALUES($1, $2, $3, $4, $5)
         RETURNING id, created_at, encrypted_message
       `
 
       const state = localLiveSession ? 'sending' : 'pending'
 
-      const result = await this.messagesCollection?.query(query, [connectionId, recipientDids, payload, state])
+      const result = await this.messagesCollection?.query(query, [
+        connectionId,
+        recipientDids,
+        payload,
+        state,
+        encryptedMessageByteCount,
+      ])
 
       const messageRecord = result?.rows[0]
 
