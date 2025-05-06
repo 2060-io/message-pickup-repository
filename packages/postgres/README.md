@@ -10,12 +10,10 @@ This package provides a simple but efficient Message Pickup Repository implement
 
 - Message storage and retrieval: save and fetch messages from a PostgreSQL database.
 - Pub/Sub integration: automatically notify other instances about new messages that arrived to a certain client.
-
 - Live session management: handle [Message Pickup V2 Live sessions](https://github.com/hyperledger/aries-rfcs/tree/main/features/0685-pickup-v2#live-mode) for efficient message delivery.
-
 - Automatic database initialization: set up the database structure required for message operations at startup.
-
 - Event-driven notifications: emit a `MessagePickupRepositoryMessageQueued` event whenever a message is queued, allowing external listeners to implement flexible notification mechanisms like push notifications or webhooks when a message has arrived for an offline user (not connected to any instance).
+- Optional byte-based retrieval: fetch messages based on their total encrypted byte size using `maxReceiveBytes`.
 
 ## How does it work?
 
@@ -23,9 +21,9 @@ This package provides a simple but efficient Message Pickup Repository implement
 
 When a new message for a certain DIDComm connection is added to the queue, `PostgresMessagePickupRepository` looks if there is an existing session with it:
 
-- If there is a local Live mode session, it will pack and deliver the message directly, adding it to the persistent queue with a particular status flag (`sending`) to reflect that it is expected to be delivered and acknowledged soon
+- If there is a local Live mode session, it will pack and deliver the message directly, adding it to the persistent queue with a particular status flag (`sending`) to reflect that it is expected to be delivered and acknowledged soon.
 - If there is not any local session, the client could be connected to another instance. Therefore, it adds the message to the persistent queue and looks into the shared message pickup session database:
-  - If there is a session registered to another instance, it will publish a notification
+  - If there is a session registered to another instance, it will publish a notification.
   - If no session is found, it emits a `MessagePickupRepositoryMessageQueued` event, which external listeners can use to handle notifications (push/webhooks).
 
 > **Note**: at the moment, all instances are notified when a message arrives for any online DIDComm connection. A possible improvement could be to create a channel per connection, so only the instance connected to that client is triggered. But it is uncertain for us yet how well it would scale when there is a large number of connected users at the same time.
@@ -60,6 +58,8 @@ Setting up PostgresMessagePickupRepository is quite simple if you have some prio
 
 You need to instance `PostgresMessagePickupRepository` with explicit database configuration (remember: it could be the same used for Credo wallet). If `postgresDatabaseName` is not specified, default `messagepickuprepository` will be used (if it does not exist, it will try to automatically create it using the provided credentials).
 
+You can also optionally define a `maxReceiveBytes` limit to control how many total bytes can be returned when retrieving messages from the queue.
+
 ```ts
 const messageRepository = new PostgresMessagePickupRepository({
   logger: yourLoggerInstance,
@@ -67,16 +67,13 @@ const messageRepository = new PostgresMessagePickupRepository({
   postgresPassword: 'your_postgres_password',
   postgresHost: 'your_postgres_host',
   postgresDatabaseName: 'your_database_name',
+  maxReceiveBytes: 10000, // Optional: total byte threshold for fetched messages
 })
 ```
 
 ### Initializing the Repository
 
-To start using the `PostgresMessagePickupRepository`, initialize it with an agent and a callback function for retrieving connection information.
-
-This callback must return another callback function that will be called by `PostgresMessagePickupRepository` when it determines that a Push Notification must be sent. It is a generic approach that makes you free to implement the Push notification service you want.
-
-Note that in this example, notification token is stored as a tag in connection records, so it is used to determine whether to create a Push notification callback or not for a given DIDComm connection.
+To start using the `PostgresMessagePickupRepository`, initialize it with an agent:
 
 ```ts
 await messagePickupRepository.initialize({ agent })
@@ -95,11 +92,28 @@ agent.events.on(MessageQueuedEventType, async ({ payload }) => {
 })
 ```
 
+### Fetching Messages with maxReceiveBytes
+
+By default, `takeFromQueue()` fetches a limited number of messages using the `limit` option. However, if the repository is configured with `maxReceiveBytes`, it will instead return as many messages as possible whose total encrypted byte size does not exceed that value.
+
+This is useful when interacting with transport layers or payload constraints (e.g., WebSocket, mobile push notifications, etc.).
+
+```ts
+// Configured with maxReceiveBytes in the repository constructor
+const messages = await messagePickupRepository.takeFromQueue({
+  connectionId,
+  recipientDid,
+  deleteMessages: false,
+})
+```
+
+> ⚠️ Only one of `limit` or `maxReceiveBytes` will be used. If both are present, `maxReceiveBytes` takes precedence.
+
 ### Injecting into an Agent instance
 
 This full example shows how `PostgresMessagePickupRepository` is created an initialized alongside an `Agent` instance:
 
-```javascript
+```ts
 import { Agent, MediatorModule, MessagePickupModule } from '@credo-ts/core'
 import { agentDependencies } from '@credo-ts/node'
 import { MessageForwardingStrategy } from '@credo-ts/core/build/modules/routing/MessageForwardingStrategy'
@@ -109,7 +123,9 @@ const messagePickupRepository = new PostgresMessagePickupRepository({
   postgresHost: 'postgres',
   postgresUser: 'user',
   postgresPassword: 'pass',
+  maxReceiveBytes: 10000,
 })
+
 const agent = new Agent({
   dependencies: agentDependencies,
   config: { label: 'Test' },
@@ -131,4 +147,4 @@ agent.events.on('MessagePickupRepositoryMessageQueued', async ({ payload }) => {
 })
 ```
 
-As you can see, all you have to do is to set up your Credo agent's `ForwardingStrategy` to to `QueueOnly` and provide a `PostgresMessagePickupRepository` instance (with the appropriate callbacks) to `MessagePickupModuleConfig`. Then, initialize both your agent and PostgresMessagePickupRepository` and have fun!
+As you can see, all you have to do is to set up your Credo agent's `ForwardingStrategy` to `QueueOnly` and provide a `PostgresMessagePickupRepository` instance. Then, initialize both your agent and the repository and have fun!
