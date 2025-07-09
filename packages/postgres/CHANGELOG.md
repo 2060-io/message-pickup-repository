@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.14](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/credo-ts-message-pickup-repository-pg@v0.0.13...@2060.io/credo-ts-message-pickup-repository-pg@v0.0.14) (2025-07-09)
+
+
+### Features
+
+* redefine receivedAt with system time when inserting messages ([#69](https://github.com/2060-io/message-pickup-repository/issues/69)) ([d2d4b6f](https://github.com/2060-io/message-pickup-repository/commit/d2d4b6fe1fe00a227a3a53529dbcf71800060d6a))
+
 ## [0.0.13](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/credo-ts-message-pickup-repository-pg@v0.0.12...@2060.io/credo-ts-message-pickup-repository-pg@v0.0.13) (2025-04-24)
 
 
