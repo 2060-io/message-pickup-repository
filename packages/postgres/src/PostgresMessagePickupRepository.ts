@@ -261,9 +261,13 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
   public async addMessage(options: AddMessageOptions): Promise<string> {
     const { connectionId, recipientDids, payload } = options
     this.logger?.debug(`[addMessage] Initializing new message for connectionId: ${connectionId}`)
-
+    const receivedAt = new Date()
     if (!this.agent) {
       throw new Error('Agent is not defined')
+    }
+
+    if (!this.messagesCollection) {
+      throw new Error('messagesCollection is not defined')
     }
 
     try {
@@ -272,19 +276,26 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
 
       // Insert message into database
       const query = `
-        INSERT INTO queued_message(connection_id, recipient_dids, encrypted_message, state) 
-        VALUES($1, $2, $3, $4) 
-        RETURNING id, created_at, encrypted_message
+        INSERT INTO queued_message(connection_id, recipient_dids, encrypted_message, state, created_at) 
+        VALUES($1, $2, $3, $4,$5) 
+        RETURNING id
       `
 
       const state = localLiveSession ? 'sending' : 'pending'
 
-      const result = await this.messagesCollection?.query(query, [connectionId, recipientDids, payload, state])
+      const result = await this.messagesCollection.query(query, [
+        connectionId,
+        recipientDids,
+        payload,
+        state,
+        receivedAt,
+      ])
 
       const messageRecord = result?.rows[0]
 
-      this.logger?.debug(`[addMessage] Message added with ID: ${messageRecord.id} for connectionId: ${connectionId}`)
-
+      this.logger?.debug(
+        `[addMessage] Message added with ID: ${messageRecord.id}, receivedAt: ${receivedAt.toISOString()} for connectionId: ${connectionId}`,
+      )
       // Verify if a live session exists in DB (other instances)
       const liveSessionInPostgres = await this.findLiveSessionInDb(connectionId)
 
@@ -294,8 +305,8 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
           id: messageRecord.id,
           connectionId,
           recipientDids,
-          encryptedMessage: messageRecord.encrypted_message,
-          receivedAt: messageRecord.created_at,
+          encryptedMessage: payload,
+          receivedAt,
           state,
         },
         session: localLiveSession || liveSessionInPostgres || undefined,
