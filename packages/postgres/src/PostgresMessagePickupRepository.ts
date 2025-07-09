@@ -277,7 +277,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
       // Insert message into database
       const query = `
         INSERT INTO queued_message(connection_id, recipient_dids, encrypted_message, state, created_at) 
-        VALUES($1, $2, $3, $4,$5) 
+        VALUES($1, $2, $3, $4, $5) 
         RETURNING id
       `
 
