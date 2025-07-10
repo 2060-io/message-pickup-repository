@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.15](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/credo-ts-message-pickup-repository-pg@v0.0.14...@2060.io/credo-ts-message-pickup-repository-pg@v0.0.15) (2025-07-10)
+
+
+### Bug Fixes
+
+* add receivedAt in takeFromQueue ([#71](https://github.com/2060-io/message-pickup-repository/issues/71)) ([fd985f6](https://github.com/2060-io/message-pickup-repository/commit/fd985f657ef7780aefa68d270c09673f3683f258))
+
 ## [0.0.14](https://github.com/2060-io/message-pickup-repository/compare/@2060.io/credo-ts-message-pickup-repository-pg@v0.0.13...@2060.io/credo-ts-message-pickup-repository-pg@v0.0.14) (2025-07-09)
 
 
