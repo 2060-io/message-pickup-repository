@@ -154,7 +154,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
       // If deleteMessages is true, just fetch messages without updating their state
       if (deleteMessages) {
         const query = `
-        SELECT id, encrypted_message, state 
+        SELECT id, encrypted_message, state, created_at 
         FROM queued_message 
         WHERE (connection_id = $1 OR $2 = ANY (recipient_dids)) AND state = 'pending' 
         ORDER BY created_at 
@@ -171,6 +171,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
         return result.rows.map((message) => ({
           id: message.id,
           encryptedMessage: message.encrypted_message,
+          receivedAt: new Date(message.created_at),
           state: message.state,
         }))
       }
@@ -187,7 +188,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
         ORDER BY created_at 
         LIMIT $3
       )
-      RETURNING id, encrypted_message, state;
+      RETURNING id, encrypted_message, state, created_at;
     `
       const params = [connectionId, recipientDid, limit ?? 0]
       const result = await this.messagesCollection?.query(query, params)
@@ -203,6 +204,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
       return result.rows.map((message) => ({
         id: message.id,
         encryptedMessage: message.encrypted_message,
+        receivedAt: new Date(message.created_at),
         state: 'sending',
       }))
     } catch (error) {
@@ -317,7 +319,7 @@ export class PostgresMessagePickupRepository implements MessagePickupRepository 
 
         await this.agent.messagePickup.deliverMessages({
           pickupSessionId: localLiveSession.id,
-          messages: [{ id: messageRecord.id, encryptedMessage: payload }],
+          messages: [{ id: messageRecord.id, encryptedMessage: payload, receivedAt }],
         })
       } else if (liveSessionInPostgres) {
         this.logger?.debug(
