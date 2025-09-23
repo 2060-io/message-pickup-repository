@@ -18,7 +18,7 @@ import {
   MessagePickupSession,
   MessagePickupSessionRole,
 } from '@credo-ts/core/build/modules/message-pickup/MessagePickupSession'
-import { Client, Pool } from 'pg'
+import { Pool } from 'pg'
 import PGPubsub from 'pg-pubsub'
 import {
   ExtendedMessagePickupSession,
@@ -27,7 +27,6 @@ import {
   PostgresMessagePickupRepositoryConfig,
 } from './interfaces'
 import { buildPgDatabaseWithMigrations } from './utils/buildPgDatabaseWithMigrations'
-import { error } from 'node:console'
 @injectable()
 export class PostgresMessagePickupRepository implements MessagePickupRepository {
   private logger?: Logger
