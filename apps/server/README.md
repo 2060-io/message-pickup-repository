@@ -20,7 +20,7 @@ MPR also interacts with a _Push Notification Service_, responsible for notifying
 
 ## API
 
-MPR API consists mainly on messages to retrieve and add messages to pickup queue, and to add/remove Live Mode Message Pickup sessions in order to be notified when a DIDComm message for a given DIDComm recipient is received. 
+MPR API consists mainly on messages to retrieve and add messages to pickup queue, and to add/remove Live Mode Message Pickup sessions in order to be notified when a DIDComm message for a given DIDComm recipient is received.
 
 The protocol is built on top of JSON-RPC 2.0 using WebSocket as transport. All methods match as much as possible (in terms of name and params) those of credo-ts' `MessagePickupRepository` interface, but adds some others used to handle sessions (subscriptions to Redis cache).
 
@@ -62,26 +62,25 @@ Most of MPR configuration is done through environment variables.
 | `APNS_TOPIC`             | The APNs topic, which is usually the app's bundle identifier.                                                                                                                             | `'default'`                                                       |
 | `NOTIFICATION_DATA_ONLY` | Indicates whether notifications should be sent as data-only.                                                                                                                              | `false`                                                           |
 
-
 ### Running locally
 
 In order to run it locally, you must install all dependencies by executing:
 
 ```bash
-$ yarn install
+pnpm install
 ```
 
 You'll need to manually run your Redis and MongoDB, accessible to MPR. Then, run MPR in the appropriate mode:
 
 ```bash
 # development
-$ yarn run start
+$ pnpm run start
 
 # watch mode
-$ yarn run start:dev
+$ pnpm run start:dev
 
 # production mode
-$ yarn run start:prod
+$ pnpm run start:prod
 ```
 
 Don't forget to set environment variables and configuration files as needed.

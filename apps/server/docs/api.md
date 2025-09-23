@@ -7,15 +7,14 @@ This documentation provides a detailed API Websocket guide for the **Message Pic
 ## Table of Contents
 
 1. [Available Methods](#available-methods)
-
-   - [takeFromQueue()](#takeFromQueue)
-   - [getAvailableMessageCount()](#getAvailableMessageCount)
-   - [addMessage()](#addMessage)
-   - [removeMessages()](#removeMessages)
-   - [removeAllMessages()](#removeAllMessages)
-   - [getLiveSession()](#getLiveSession)
-   - [addLiveSession()](#addLiveSession)
-   - [removeLiveSession()](#removeLiveSession)
+   - [takeFromQueue()](#takefromqueue)
+   - [getAvailableMessageCount()](#getavailablemessagecount)
+   - [addMessage()](#addmessage)
+   - [removeMessages()](#removemessages)
+   - [removeAllMessages()](#removeallmessages)
+   - [getLiveSession()](#getlivesession)
+   - [addLiveSession()](#addlivesession)
+   - [removeLiveSession()](#removelivesession)
 
 2. [Pub/Sub Instance Handler](#pubsub-instance-handler)
 3. [Push Notifications Handler](#push-notifications-handler)
@@ -136,12 +135,10 @@ Push notifications are triggered under the following conditions:
 ### How Does It Work?
 
 1. **Message Queuing**:
-
    - When a new message is received, it is added to a queue in **Redis** for fast access and stored in **MongoDB** for persistence.
    - If the client is offline, the system initiates the push notification process.
 
 2. **Notification Services**:
-
    - **FCM**: The `FcmNotificationSender` class handles the sending of notifications to Android devices.
    - **APNs**: The `ApnNotificationSender` class handles the sending of notifications to iOS devices.
 

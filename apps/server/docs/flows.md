@@ -1,12 +1,12 @@
-## Flows
+# Flows
 
 In this document we can see some details of common flows involving different components of a deployment based on MPR.
 
-### Live Mode Session Add/Remove
+## Live Mode Session Add/Remove
 
 ![Live Mode Session Add/Remove](./diagrams/live-mode-session-add-remove.png)
 
-Whenever a DIDComm agent is connected to Mediator instance (MPR Client) and a Live Mode session is created, MPR must be informed about it in order to susbcribe to any incoming message for it. 
+Whenever a DIDComm agent is connected to Mediator instance (MPR Client) and a Live Mode session is created, MPR must be informed about it in order to susbcribe to any incoming message for it.
 
 This Live Mode session will be indexed by the DID of the recipient.
 
@@ -26,6 +26,4 @@ When there is not any subscriber for a recipient, it is assumed that it is not c
 
 In this example we have three different clients: two of them are Mediator instances that hold a Live Session to the Recipient (in different moments), while the third one just receives a message from an external Sender and posts it into the pickup queue.
 
-
 ![Sudden Live Mode closing/opening issue](./diagrams/multi-instance-message-and-session-management.png)
-
