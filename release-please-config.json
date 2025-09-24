@@ -5,5 +5,16 @@
   "separate-pull-requests": true,
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
+  "packages": {
+    "packages/client": {
+      "release-type": "node"
+    },
+    "apps/server": {
+      "release-type": "node"
+    },
+    "packages/postgres": {
+      "release-type": "node"
+    }
+  },
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json"
 }
