@@ -89,8 +89,9 @@ export class FcmNotificationSender {
           },
           payload: {
             aps: {
+              // no title: the operating system shows the receiving app's own name and icon above the alert, so one
+              // mediator serves several wallet apps without any of them showing another's brand
               alert: {
-                title: 'Hologram',
                 body: 'You have new messages',
               },
               'content-available': 1,
@@ -105,10 +106,9 @@ export class FcmNotificationSender {
         },
       }
 
-      // Add notification content if it's not data-only
+      // Add notification content if it's not data-only (brand-free: the app's own name is shown by the OS)
       if (!this.isDataOnly) {
         messagePayload.notification = {
-          title: 'Hologram',
           body: 'You have new messages',
         }
       }

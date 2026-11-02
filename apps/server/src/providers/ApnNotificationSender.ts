@@ -86,10 +86,10 @@ export class ApnNotificationSender {
         topic: this.configService.get('appConfig.apnsTopic'),
       })
 
-      // Add alert if the notification is not data-only
+      // Add alert if the notification is not data-only; no title: the operating system shows the receiving
+      // app's own name and icon above the alert, so one mediator serves several wallet apps brand-free
       if (!this.isDataOnly) {
         notification.alert = {
-          title: 'Hologram',
           body: 'You have new messages',
         }
       }
